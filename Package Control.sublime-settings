@@ -1,0 +1,37 @@
+{
+	"installed_packages":
+	[
+		"AdvancedNewFile",
+		"All Autocomplete",
+		"Capybara Snippets",
+		"CoffeeScript",
+		"Cucumber",
+		"Cucumber Step Finder",
+		"Dayle Rees Color Schemes",
+		"EJS",
+		"Emmet",
+		"Gem Browser",
+		"Git",
+		"GitGutter",
+		"Haml",
+		"Jade",
+		"Jasmine",
+		"Javascript Beautify",
+		"JSHint",
+		"JSHint Gutter",
+		"LESS",
+		"Meteor Snippets",
+		"nginx",
+		"Package Control",
+		"Pretty JSON",
+		"RSpec",
+		"Sass",
+		"SCSS",
+		"SideBarEnhancements",
+		"ST2SyntaxFromFileName",
+		"Theme - Spacegray",
+		"TrailingSpaces",
+		"VintageEx",
+		"WakaTime"
+	]
+}

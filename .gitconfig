@@ -1,0 +1,15 @@
+[user]
+	name = Keith Mazanec
+	email = kmazanec@bradsdeals.com
+[core]
+	editor = mvim
+[color]
+	ui = true
+[credential]
+	helper = osxkeychain
+[push]
+	default = tracking
+[alias]
+  co = checkout
+  doff = reset HEAD^
+  tree = log --graph --oneline --decorate --color --all
