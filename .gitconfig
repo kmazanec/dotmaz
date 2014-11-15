@@ -1,6 +1,6 @@
 [user]
 	name = Keith Mazanec
-	email = kmazanec@bradsdeals.com
+	email = k.mazanec@gmail.com
 [core]
 	editor = mvim
 [color]
@@ -13,3 +13,8 @@
   co = checkout
   doff = reset HEAD^
   tree = log --graph --oneline --decorate --color --all
+  st = status
+  br = branch
+  hist = log --pretty=format:'%h %ad | %s%d [%an]' --graph --date=short
+  type = cat-file -t
+  dump = cat-file -p
