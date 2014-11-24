@@ -4,7 +4,7 @@ fi
 
 
 function parse_git_branch () {
-       git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
+  git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
 }
 
 
@@ -17,6 +17,7 @@ alias gco='git checkout '
 alias gk='gitk --all&'
 alias gx='gitx --all'
 alias gp='git push '
+alias gpu='git push origin HEAD -u'
 alias gap='git add -p'
 
 alias gt='git log --oneline --graph --color --all --decorate'
@@ -56,14 +57,14 @@ export PATH="$HOME/dev/go/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
 
 read -d '' Lobster <<"EOF"
-.                               ,.---.
+`                               ,.---.
                       ,,,,     /    _ `.
                        \\\\\\\\   /      \\  )
                         |||| /\\/``-.__\\/
                         ::::/\\/_
-        {{`-.__.-'(`(^^(^^^(^ 9 `.========='
-       {{{{{{ { ( ( (  (   (-----:=
-        {{.-'~~'-.(,(,,(,,,(__6_.'=========.
+      {{`-.__.-'(`(`(^^(^^^(^ 9 `.========='
+     {{{{{{ { ( ( ( (  (   (-----:=
+      {{.-'~~'-.(,(,(,,(,,,(__6_.'=========.
                         ::::\\/\\
                         |||| \\/\\  ,-'/\\
                        ////   \\ `` _/  )
@@ -75,22 +76,41 @@ EOF
 alias lobster='echo $(tput setaf 1)"${Lobster}"'
 
 myrspec() {
-    rspec $1 && unicornleap
+  rspec $1 && unicornleap
 }
 mycucumber() {
-    cucumber $1 && unicornleap
+  cucumber $1 && unicornleap
 }
 myrake() {
-    rake $1 && unicornleap
+  rake $1 && unicornleap
 }
 alias rspec=myrspec
 alias cucumber=mycucumber
 alias rake=myrake
 
+start_mysql() {
+  UP=$(pgrep mysql | wc -l);
+  if [ "$UP" -ne 1 ];
+  then
+    echo " -> starting MySQL";
+    mysql.server start
+  else
+    echo " -> MySQL still running";
+  fi
+}
 
+alias us=users_local
 function users_local () {
   echo "User services? Good call, run it locally..."
   cd ~/dev/user_services
+  echo " -> fetching the latest rantings of the drunken observer"
   git pull
+  echo " -> redis & mysql running? you might need that..."
+  start_mysql
+  launchctl load ~/Library/LaunchAgents/homebrew.mxcl.redis.plist
+  echo " -> attempting to run any fresh migrations"
+  rake db:migrate
+  echo " -> starting a server on port 3001..."
   rails s -p 3001
 }
+
