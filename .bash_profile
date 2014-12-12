@@ -25,7 +25,8 @@ alias gt='git log --oneline --graph --color --all --decorate'
 alias ls='ls -FGh'
 alias ll='ls -lFGh'
 
-alias bashp='subl ~/.bash_profile'
+alias bashp='vi ~/.bash_profile'
+alias dotmaz='cd ~/dev/dotfiles/dotmaz'
 
 alias bd="cd ~/dev/bd_rails4"
 
