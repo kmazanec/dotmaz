@@ -34,6 +34,9 @@ alias bd="cd ~/dev/bd_rails4"
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
 
 
+alias ark='ino build && ino upload'
+
+
 BLUE="\[\033[0;34m\]"
 DARK_BLUE="\[\033[1;34m\]"
 RED="\[\033[0;31m\]"
