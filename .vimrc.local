@@ -3,6 +3,7 @@ set gfn=Monaco:h13
 colorscheme base16-pop
 
 :autocmd BufNewFile,BufRead *.ejs set syntax=jst
+:autocmd BufNewFile,BufRead *.us set syntax=jst
 :autocmd BufWritePre *.go :GoImports
 
 inoremap jk <esc>
