@@ -1,6 +1,6 @@
 set background=dark
 set gfn=Monaco:h13
-colorscheme base16-pop
+colorscheme base16-summerfruit
 
 :autocmd BufNewFile,BufRead *.ejs set syntax=jst
 :autocmd BufNewFile,BufRead *.us set syntax=jst
