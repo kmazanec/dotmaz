@@ -51,7 +51,7 @@ LIGHT_CYAN="\[\033[1;36m\]"
 NO_COLOUR="\[\033[0m\]"
 
 
-PS1="$GREEN\u$NO_COLOUR: /\W$CYAN\$(parse_git_branch)$NO_COLOUR \$ "
+PS1="$GREEN\u$NO_COLOUR: \W/$CYAN\$(parse_git_branch)$NO_COLOUR -> "
 
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
 
