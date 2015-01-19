@@ -22,8 +22,8 @@ alias gap='git add -p'
 
 alias gt='git log --oneline --graph --color --all --decorate'
 
-alias ls='ls -FGhA --color'
-alias ll='ls -lFGhA --color'
+alias ls='ls -FGh --color'
+alias ll='ls -lFGhX --color'
 
 alias bashp='vi ~/.bash_profile'
 alias dotmaz='cd ~/dev/dotfiles/dotmaz'
