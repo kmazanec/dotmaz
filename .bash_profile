@@ -66,7 +66,7 @@ function git_color {
     echo -e "$YELLOW ⎈"
   elif [[ ! $git_status =~ "working directory clean" ]]; then
     echo -e "$RED ☢"
-  elif [[ $git_status =~ "Your branch is ahead of" ]]; then
+  elif [[ $git_status =~ "Your branch is ahead of" || $git_status =~ "have diverged" ]]; then
     echo -e "$BLUE ☛"
   elif [[ $git_status =~ "nothing to commit" ]]; then
     echo -e "$GREEN ✓"
