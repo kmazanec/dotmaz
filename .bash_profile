@@ -57,27 +57,35 @@ function parse_git_branch () {
   git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
 }
 
-function git_color {
+function set_git_color {
   local git_status="$(git status 2> /dev/null)"
 
   if [[ $git_status == "" ]]; then
-    echo ""
+    git_color=""
+    git_symbol=""
   elif [[ $git_status =~ "Changes to be committed" ]]; then
-    echo -e "$YELLOW ⎈"
+    git_color="$YELLOW"
+    git_symbol="⎈"
   elif [[ ! $git_status =~ "working directory clean" ]]; then
-    echo -e "$RED ☢"
+    git_color="$RED"
+    git_symbol="☢"
   elif [[ $git_status =~ "Your branch is ahead of" || $git_status =~ "have diverged" ]]; then
-    echo -e "$BLUE ☛"
+    git_color="$BLUE"
+    git_symbol="☛"
   elif [[ $git_status =~ "nothing to commit" ]]; then
-    echo -e "$GREEN ✓"
+    git_color="$GREEN"
+    git_symbol="✓"
   else
-    echo -e "$CYAN"
+    git_color="$CYAN"
+    git_symbol=""
   fi
+
+  export git_color
+  export git_symbol
 }
 
-
-PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\$(git_color)\[$CYAN\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
-
+PROMPT_COMMAND=set_git_color
+PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$CYAN\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
 
 
 
