@@ -1,4 +1,7 @@
 {
+	"in_process_packages":
+	[
+	],
 	"installed_packages":
 	[
 		"AdvancedNewFile",
@@ -10,12 +13,13 @@
 		"Dayle Rees Color Schemes",
 		"EJS",
 		"Emmet",
+		"Floobits",
 		"Gem Browser",
 		"Git",
 		"GitGutter",
 		"Haml",
 		"Jade",
-		"Jasmine",
+		"Jasmine JS",
 		"Javascript Beautify",
 		"JSHint",
 		"JSHint Gutter",

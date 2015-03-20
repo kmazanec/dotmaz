@@ -13,12 +13,12 @@
 			"Jasmine"
 		]
 	],
-	"font_size": 13.0,
+	"font_size": 14.0,
 	"highlight_modified_tabs": true,
 	"ignored_packages":
 	[
 		"Haml",
-		"Javascript Beautify",
+		"JSHint",
 		"Dayle Rees Color Schemes"
 	],
 	"save_on_focus_lost": true,
