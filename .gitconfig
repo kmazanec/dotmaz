@@ -2,7 +2,7 @@
 	name = Keith Mazanec
 	email = k.mazanec@gmail.com
 [core]
-	editor = mvim
+	editor = vi
 [color]
 	ui = true
 [credential]
