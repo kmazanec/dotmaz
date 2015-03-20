@@ -28,6 +28,7 @@ alias ll='ls -lFGh'
 
 alias bashp='vi ~/.bash_profile'
 alias dotmaz='cd ~/dev/dotfiles/dotmaz'
+alias sicp='racket -i -p neil/sicp -l xrepl'
 alias bd="cd ~/dev/bd_rails4"
 
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
@@ -94,6 +95,7 @@ PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}
 export GOPATH="$HOME/dev/go"
 export PATH="$HOME/dev/go/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
+export PATH="/Applications/Racket_v6.1.1/bin:$PATH"
 
 # Setting PATH for Python 3.4
 # The orginal version is saved in .bash_profile.pysave
