@@ -93,6 +93,7 @@ PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}
 # === PATH SETUP === #
 
 export GOPATH="$HOME/dev/go"
+export PATH="$HOME/dev/javascript/depot_tools:$PATH"
 export PATH="$HOME/dev/go/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
 export PATH="/Applications/Racket_v6.1.1/bin:$PATH"
