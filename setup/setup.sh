@@ -51,3 +51,8 @@ echo 'Setting up keyboard preferences'
 
 defaults write -g InitialKeyRepeat -int 15
 defaults write -g KeyRepeat -int 1
+
+
+echo "You'll want to install sublime text next: http://www.sublimetext.com/3"
+echo "and then the package manager: https://packagecontrol.io/installation"
+echo "and then run the sublime install script to symlink the files"
