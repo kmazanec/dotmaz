@@ -10,6 +10,10 @@ echo 'Installing fav brews...'
 
 brew install macvim
 brew install python
+brew install chruby
+brew install ruby-install
+brew install mercurial
+brew install go
 
 
 echo 'Setting up .files'
