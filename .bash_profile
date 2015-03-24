@@ -33,6 +33,7 @@ alias bashp='vi ~/.bash_profile'
 alias dotmaz='cd ~/dev/dotfiles/dotmaz'
 alias sicp='racket -i -p neil/sicp -l xrepl'
 alias bd="cd ~/dev/bd_rails4"
+alias be="bundle exec "
 
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
 
