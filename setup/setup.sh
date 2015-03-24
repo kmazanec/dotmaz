@@ -14,6 +14,7 @@ brew install chruby
 brew install ruby-install
 brew install mercurial
 brew install go
+brew install leiningen
 
 
 echo 'Setting up .files'
