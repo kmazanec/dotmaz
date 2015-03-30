@@ -136,7 +136,7 @@ function users_local () {
   start_mysql
   launchctl load ~/Library/LaunchAgents/homebrew.mxcl.redis.plist
   echo " -> attempting to run any fresh migrations"
-  rake db:migrate
+  bundle exec rake db:migrate
   echo " -> starting a server on port 3001..."
   rails s -p 3001
 }
