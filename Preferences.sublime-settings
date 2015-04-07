@@ -17,9 +17,9 @@
 	"highlight_modified_tabs": true,
 	"ignored_packages":
 	[
-		"JSHint",
+		"Haml",
 		"Dayle Rees Color Schemes",
-		"Haml"
+		"JSHint"
 	],
 	"save_on_focus_lost": true,
 	"scroll_past_end": true,
