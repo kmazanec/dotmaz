@@ -26,6 +26,7 @@ ln -s $PWD/.gitconfig ~/.gitconfig
 ln -s $PWD/.vimbundle.local ~/.vimbundle.local
 ln -s $PWD/.vimrc.local ~/.vimrc.local
 ln -s $PWD/.psqlrc ~/.psqlrc
+ln -s $PWD/profiles.clj ~/.lein/profiles.clj
 
 
 echo 'Loading dotmatrix'
