@@ -9,6 +9,8 @@ colorscheme base16-summerfruit
 inoremap jk <esc>
 inoremap kj <esc>
 
+nnoremap <BS> :set hlsearch! hlsearch?<cr>
+
 vnoremap < <gv
 vnoremap > >gv
 
