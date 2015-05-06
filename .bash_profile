@@ -138,7 +138,7 @@ function users_local () {
   echo " -> attempting to run any fresh migrations"
   bundle exec rake db:migrate
   echo " -> starting a server on port 3001..."
-  rails s -p 3001
+  bundle exec rails s -p 3001
 }
 
 

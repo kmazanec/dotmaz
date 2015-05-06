@@ -15,6 +15,7 @@ brew install ruby-install
 brew install mercurial
 brew install go
 brew install leiningen
+brew install redis
 
 
 echo 'Setting up .files'
