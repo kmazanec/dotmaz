@@ -61,7 +61,12 @@ alias gt='git log --oneline --graph --color --all --decorate'
 
 # === GIT PS1 HELPERS === #
 
-function parse_git_branch () {
+function set_prompt {
+  set_git_color
+  set_window_title "${PWD##*/}"
+}
+
+function parse_git_branch {
   git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
 }
 
@@ -92,7 +97,16 @@ function set_git_color {
   export git_symbol
 }
 
-PROMPT_COMMAND=set_git_color
+function set_window_title {
+  case $TERM in
+    *xterm*|ansi)
+    echo -n -e "\033]0;$*\007"
+    ;;
+  esac
+}
+
+PROMPT_COMMAND=set_prompt
+
 PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$CYAN\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
 
 
@@ -114,7 +128,6 @@ export PATH
 export DOCKER_CERT_PATH=/Users/kmaz/.boot2docker/certs/boot2docker-vm
 export DOCKER_TLS_VERIFY=1
 export DOCKER_HOST=tcp://192.168.59.103:2376
-
 
 # === BRADS DEALS HELPERS === #
 
