@@ -35,7 +35,6 @@ alias ll='ls -lFGh'
 alias bashp='vi ~/.bash_profile'
 alias dotmaz='cd ~/dev/dotfiles/dotmaz'
 alias sicp='racket -i -p neil/sicp -l xrepl'
-alias bd="cd ~/dev/bd_rails4"
 alias be="bundle exec "
 
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
@@ -155,6 +154,28 @@ function users_local () {
   bundle exec rake db:migrate
   echo " -> starting a server on port 3001..."
   bundle exec rails s -p 3001
+}
+
+function bd () {
+  if [ "$1" == "bf" ]; then
+    be rails s -p 3004
+  elif [ "$1" == "content" ]; then
+    be rails s -p 3002
+  elif [ "$1" == "credit" ]; then
+    be rails s -p 3009
+  elif [ "$1" == "discussions" ]; then
+    be rails s -p 3007
+  elif [ "$1" == "engagements" ]; then
+    RAILS_ENV=development be unicorn -c config/unicorn.rb -p 3010
+  elif [ "$1" == "placements" ]; then
+    be rails s -p 3005
+  elif [ "$1" == "users" ]; then
+    users_local
+  elif [ "$1" == "www" ]; then
+    be rails s
+  else
+    echo "Unrecognized app name: $1"
+  fi
 }
 
 
