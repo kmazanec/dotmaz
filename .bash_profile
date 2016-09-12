@@ -175,8 +175,26 @@ function bd () {
     users_local
   elif [ "$1" == "www" ]; then
     be rails s
+  elif [ "$1" == "feedbuilder" ]; then
+    go run feedbuilder.go
+  elif [ "$1" == "cms" ]; then
+    npm start
+  elif [ "$1" == "image_resize" ]; then
+    be rackup
   else
     echo "Unrecognized app name: $1"
+    echo "Options:"
+    echo " - www (3000)"
+    echo " - users (3001)"
+    echo " - content (3002)"
+    echo " - bf (3004)"
+    echo " - placements (3005)"
+    echo " - discussions (3007)"
+    echo " - credit (3009)"
+    echo " - engagements (3010)"
+    echo " - feedbuilder (8080)"
+    echo " - cms (8000)"
+    echo " - image_resize (9292)"
   fi
 }
 
