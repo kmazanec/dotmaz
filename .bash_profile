@@ -10,6 +10,8 @@ source /usr/local/opt/chruby/share/chruby/auto.sh
 export NVM_DIR="/Users/kmazanec/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 
+export BUNDLER_EDITOR="mvim"
+
 
 # === COLORS === #
 
