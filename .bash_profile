@@ -237,5 +237,5 @@ myrake() {
 # alias cucumber=mycucumber
 # alias rake=myrake
 
-
+[ ! -f "$HOME/.bashrc.local" ] || . "$HOME/.bashrc.local"
 
