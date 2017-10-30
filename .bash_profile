@@ -43,6 +43,8 @@ alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
 
 alias ark='ino build && ino upload'  # Arduino SDK on mac
 
+alias slackmojify="mogrify -resize 128x128 -unsharp 2x1.4+0.5+0 -quality 100 -verbose"
+
 
 # === GIT ALIASES === #
 
