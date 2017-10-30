@@ -82,7 +82,7 @@ function set_git_color {
   elif [[ $git_status =~ "Changes to be committed" ]]; then
     git_color="$YELLOW"
     git_symbol="⎈"
-  elif [[ ! $git_status =~ "working directory clean" ]]; then
+  elif [[ ! $git_status =~ "working tree clean" ]]; then
     git_color="$RED"
     git_symbol="☢"
   elif [[ $git_status =~ "Your branch is ahead of" || $git_status =~ "have diverged" ]]; then
