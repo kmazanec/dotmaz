@@ -151,8 +151,7 @@ function users_local () {
   cd ~/dev/user_services
   echo " -> fetching the latest rantings of the drunken observer"
   git pull
-  echo " -> redis & mysql running? you might need that..."
-  start_mysql
+  echo " -> redis running? you might need that..."
   launchctl load ~/Library/LaunchAgents/homebrew.mxcl.redis.plist
   echo " -> attempting to run any fresh migrations"
   bundle exec rake db:migrate
@@ -167,6 +166,8 @@ function bd () {
     be rails s -p 3002
   elif [ "$1" == "credit" ]; then
     be rails s -p 3009
+  elif [ "$1" == "et_proxy" ]; then
+    foreman start
   elif [ "$1" == "discussions" ]; then
     be rails s -p 3007
   elif [ "$1" == "engagements" ]; then
@@ -176,7 +177,7 @@ function bd () {
   elif [ "$1" == "users" ]; then
     users_local
   elif [ "$1" == "www" ]; then
-    be rails s
+    be rails s -b 0.0.0.0
   elif [ "$1" == "feedbuilder" ]; then
     go run feedbuilder.go
   elif [ "$1" == "cms" ]; then
@@ -192,6 +193,7 @@ function bd () {
     echo " - bf (3004)"
     echo " - placements (3005)"
     echo " - discussions (3007)"
+    echo " - et_proxy (3008)"
     echo " - credit (3009)"
     echo " - engagements (3010)"
     echo " - feedbuilder (8080)"
