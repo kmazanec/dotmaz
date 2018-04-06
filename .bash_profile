@@ -10,6 +10,15 @@ source /usr/local/opt/chruby/share/chruby/auto.sh
 export NVM_DIR="/Users/kmazanec/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 
+enter_directory() {
+  if [[ $PWD == $PREV_PWD ]]; then
+    return
+  fi
+
+  PREV_PWD=$PWD
+  [[ -f ".nvmrc" ]] && nvm use
+}
+
 export BUNDLER_EDITOR="mvim"
 
 
@@ -67,6 +76,7 @@ alias gt='git log --oneline --graph --color --all --decorate'
 function set_prompt {
   set_git_color
   set_window_title "${PWD##*/}"
+  enter_directory
 }
 
 function parse_git_branch {
