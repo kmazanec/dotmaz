@@ -35,6 +35,11 @@ set statusline+=%#warningmsg#
 set statusline+=%{SyntasticStatuslineFlag()}
 set statusline+=%*
 
+" Point syntastic checker at locally installed `eslint` if it exists.
+if executable('./node_modules/.bin/eslint')
+  let b:syntastic_javascript_eslint_exec = './node_modules/.bin/eslint'
+endif
+
 let g:syntastic_always_populate_loc_list = 1
 let g:syntastic_auto_loc_list = 2
 let g:syntastic_check_on_open = 0
@@ -53,3 +58,6 @@ let g:syntastic_warning_symbol = "◦"
 let g:syntastic_javascript_checkers = ["jshint", "jscs"]
 let g:syntastic_jsx_checkers = ["eslint"]
 " let g:syntastic_javascript_jscs_args = "-x"
+
+set exrc
+set secure
