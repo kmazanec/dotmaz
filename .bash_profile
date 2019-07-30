@@ -121,7 +121,7 @@ function set_window_title {
 
 PROMPT_COMMAND=set_prompt
 
-PS1="\[$GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$CYAN\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
+PS1="\[$DARK_GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
 
 
 
