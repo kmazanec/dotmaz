@@ -127,21 +127,20 @@ PS1="\[$DARK_GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_sy
 
 # === PATH SETUP === #
 
+export GOBIN="$HOME/dev/go/bin"
 export GOPATH="$HOME/dev/go"
 export PATH="$HOME/dev/javascript/depot_tools:$PATH"
 export PATH="$HOME/dev/go/bin:$PATH"
 export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/local/go/bin:$PATH"
+export PATH="/usr/local/opt/go/libexec/bin:$PATH"
 export PATH="/Applications/Racket_v6.1.1/bin:$PATH"
+export PATH="/usr/local/opt/qt@5.5/bin:$PATH"
 
 # Setting PATH for Python 3.4
 # The orginal version is saved in .bash_profile.pysave
 PATH="/Library/Frameworks/Python.framework/Versions/3.4/bin:${PATH}"
 export PATH
-
-
-export DOCKER_CERT_PATH=/Users/kmaz/.boot2docker/certs/boot2docker-vm
-export DOCKER_TLS_VERIFY=1
-export DOCKER_HOST=tcp://192.168.59.103:2376
 
 # === BRADS DEALS HELPERS === #
 
