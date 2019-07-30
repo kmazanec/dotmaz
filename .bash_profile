@@ -145,6 +145,8 @@ export DOCKER_HOST=tcp://192.168.59.103:2376
 
 # === BRADS DEALS HELPERS === #
 
+export NGINX_DOCKER_HOME="$HOME/dev/toolshed/docker"
+
 start_mysql() {
   UP=$(pgrep mysql | wc -l);
   if [ "$UP" -ne 1 ];
@@ -170,7 +172,7 @@ function users_local () {
   bundle exec rails s -p 3001
 }
 
-function bd () {
+function bds () {
   if [ "$1" == "bf" ]; then
     be rails s -p 3004
   elif [ "$1" == "content" ]; then
