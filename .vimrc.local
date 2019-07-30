@@ -35,6 +35,10 @@ set statusline+=%#warningmsg#
 set statusline+=%{SyntasticStatuslineFlag()}
 set statusline+=%*
 
+let vim_markdown_preview_hotkey='<C-m>'
+let vim_markdown_preview_github=1
+let vim_markdown_preview_toggle=3
+
 " Point syntastic checker at locally installed `eslint` if it exists.
 if executable('./node_modules/.bin/eslint')
   let b:syntastic_javascript_eslint_exec = './node_modules/.bin/eslint'
@@ -51,6 +55,8 @@ let g:syntastic_style_warning_symbol = "◦"
 
 let g:syntastic_error_symbol = "●"
 let g:syntastic_warning_symbol = "◦"
+
+let g:syntastic_ruby_checkers = ["rubocop"]
 
 " let g:syntastic_javascript_checkers = ["eslint"]
 " let g:syntastic_jsx_checkers = ["eslint"]
