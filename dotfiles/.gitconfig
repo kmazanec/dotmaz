@@ -1,14 +1,14 @@
 [user]
-	name = Keith Mazanec
-	email = k.mazanec@gmail.com
+  name = Keith Mazanec
+  email = k.mazanec@gmail.com
 [core]
-	editor = vim
+  editor = vim
 [color]
-	ui = true
+  ui = true
 [credential]
-	helper = osxkeychain
+  helper = osxkeychain
 [push]
-	default = tracking
+  default = tracking
 [alias]
   co = checkout
   doff = reset HEAD^

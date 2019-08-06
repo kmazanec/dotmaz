@@ -5,8 +5,6 @@ fi
 source /usr/local/opt/chruby/share/chruby/chruby.sh
 source /usr/local/opt/chruby/share/chruby/auto.sh
 
-# [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
-
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 
@@ -45,15 +43,10 @@ alias ll='ls -lFGh'
 
 alias bashp='vi ~/.bash_profile'
 alias dotmaz='cd ~/dev/dotfiles/dotmaz'
-alias sicp='racket -i -p neil/sicp -l xrepl'
 alias be="bundle exec "
 alias ba="./bin/app"
 
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
-
-alias ark='ino build && ino upload'  # Arduino SDK on mac
-
-alias slackmojify="mogrify -resize 128x128 -unsharp 2x1.4+0.5+0 -quality 100 -verbose"
 
 
 # === GIT ALIASES === #
@@ -121,55 +114,29 @@ function set_window_title {
 
 PROMPT_COMMAND=set_prompt
 
-PS1="\[$DARK_GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
+# PS1="\[$DARK_GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
 
 
 
 # === PATH SETUP === #
 
-export GOBIN="$HOME/dev/go/bin"
-export GOPATH="$HOME/dev/go"
-export PATH="$HOME/dev/javascript/depot_tools:$PATH"
-export PATH="$HOME/dev/go/bin:$PATH"
-export PATH="/usr/local/bin:$PATH"
-export PATH="/usr/local/go/bin:$PATH"
-export PATH="/usr/local/opt/go/libexec/bin:$PATH"
-export PATH="/Applications/Racket_v6.1.1/bin:$PATH"
-export PATH="/usr/local/opt/qt@5.5/bin:$PATH"
+# export GOBIN="$HOME/dev/go/bin"
+# export GOPATH="$HOME/dev/go"
+# export PATH="$HOME/dev/javascript/depot_tools:$PATH"
+# export PATH="$HOME/dev/go/bin:$PATH"
+# export PATH="/usr/local/bin:$PATH"
+# export PATH="/usr/local/go/bin:$PATH"
+# export PATH="/usr/local/opt/go/libexec/bin:$PATH"
+# export PATH="/usr/local/opt/qt@5.5/bin:$PATH"
 
 # Setting PATH for Python 3.4
 # The orginal version is saved in .bash_profile.pysave
-PATH="/Library/Frameworks/Python.framework/Versions/3.4/bin:${PATH}"
-export PATH
+# PATH="/Library/Frameworks/Python.framework/Versions/3.4/bin:${PATH}"
+# export PATH
 
 # === BRADS DEALS HELPERS === #
 
 export NGINX_DOCKER_HOME="$HOME/dev/toolshed/docker"
-
-start_mysql() {
-  UP=$(pgrep mysql | wc -l);
-  if [ "$UP" -ne 1 ];
-  then
-    echo " -> starting MySQL";
-    mysql.server start
-  else
-    echo " -> MySQL still running";
-  fi
-}
-
-alias us=users_local
-function users_local () {
-  echo "User services? Good call, run it locally..."
-  cd ~/dev/user_services
-  echo " -> fetching the latest rantings of the drunken observer"
-  git pull
-  echo " -> redis running? you might need that..."
-  launchctl load ~/Library/LaunchAgents/homebrew.mxcl.redis.plist
-  echo " -> attempting to run any fresh migrations"
-  bundle exec rake db:migrate
-  echo " -> starting a server on port 3001..."
-  bundle exec rails s -p 3001
-}
 
 function bds () {
   if [ "$1" == "bf" ]; then
@@ -187,7 +154,7 @@ function bds () {
   elif [ "$1" == "placements" ]; then
     be rails s -p 3005
   elif [ "$1" == "users" ]; then
-    users_local
+    be rails s -p 3001
   elif [ "$1" == "www" ]; then
     be rails s -b 0.0.0.0
   elif [ "$1" == "feedbuilder" ]; then
@@ -235,19 +202,6 @@ read -d '' Lobster <<"EOF"
 EOF
 
 alias lobster='echo $(tput setaf 1)"${Lobster}"'
-
-myrspec() {
-  rspec $1 && unicornleap
-}
-mycucumber() {
-  cucumber $1 && unicornleap
-}
-myrake() {
-  rake $1 && unicornleap
-}
-# alias rspec=myrspec
-# alias cucumber=mycucumber
-# alias rake=myrake
 
 [ ! -f "$HOME/.bashrc.local" ] || . "$HOME/.bashrc.local"
 
