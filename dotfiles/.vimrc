@@ -1,5 +1,5 @@
 set background=dark
-" set gfn=MonacoB2:h13
+set gfn=MonacoB2:h13
 " colorscheme base16-tomorrow
 let &t_Co=256
 
@@ -35,10 +35,6 @@ vnoremap > >gv
 let g:indent_guides_enable_on_vim_startup = 1
 let g:indent_guides_start_level = 2
 
-"set statusline+=col:\ %c
-"set statusline+=%#warningmsg#
-"set statusline+=%{SyntasticStatuslineFlag()}
-"set statusline+=%*
 set statusline=col:\ %c%#warningmsg#%{SyntasticStatuslineFlag()}%*
 
 let vim_markdown_preview_hotkey='<C-m>'
