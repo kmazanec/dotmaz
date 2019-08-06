@@ -204,4 +204,5 @@ EOF
 alias lobster='echo $(tput setaf 1)"${Lobster}"'
 
 [ ! -f "$HOME/.bashrc.local" ] || . "$HOME/.bashrc.local"
+[ ! -f "$HOME/.bash_profile.local" ] || . "$HOME/.bash_profile.local"
 
