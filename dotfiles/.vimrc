@@ -1,6 +1,17 @@
+" =================
+" Plugin Setup
+call plug#begin('~/.vim/plugged')
+
+Plug 'scrooloose/nerdtree'
+Plug 'wakatime/vim-wakatime'
+
+call plug#end()
+" =================
+
 set background=dark
 set gfn=MonacoB2:h13
 " colorscheme base16-tomorrow
+colorscheme darkblue
 let &t_Co=256
 
 " Show line numbers by default
@@ -14,6 +25,11 @@ set cursorline
 
 " Toggle cursorline
 nnoremap <Leader>c :set cursorline!<cr>
+
+" NerdTree customization
+nnoremap <Leader>f :NERDTreeToggle<Enter>
+"let NERDTreeMinimalUI = 1
+"let NERDTreeDirArrows = 1
 
 set foldmethod=syntax
 

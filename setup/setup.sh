@@ -43,6 +43,11 @@ do
   fi
 done
 
+echo "Installing Vim plugin manager"
+
+# Set up vim plugin manager
+curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+
 # TODO: install postgres
 
 echo "Installing NVM, latest node, latest yarn"
@@ -64,13 +69,3 @@ curl -o- -L https://yarnpkg.com/install.sh | bash
 # 
 # echo 'Running install script'
 # bin/install
-# 
-# echo 'Installing vimbundles'
-# bin/vimbundles.sh
-# popd
-# 
-# 
-# echo 'Setting up pathogen'
-# 
-# mkdir ~/.vim/autoload
-# curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
