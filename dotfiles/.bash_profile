@@ -2,6 +2,10 @@ if [ -f ~/.git-completion.bash ]; then
   . ~/.git-completion.bash
 fi
 
+if [ -f ~/.git-prompt.sh ]; then
+  . ~/.git-prompt.sh
+fi
+
 source /usr/local/opt/chruby/share/chruby/chruby.sh
 source /usr/local/opt/chruby/share/chruby/auto.sh
 
@@ -19,22 +23,6 @@ enter_directory() {
 }
 
 export BUNDLER_EDITOR="mvim"
-
-
-# === COLORS === #
-
-BLUE="\033[0;34m"
-DARK_BLUE="\033[1;34m"
-RED="\033[0;31m"
-DARK_RED="\033[1;31m"
-YELLOW="\033[0;33m"
-GREEN="\033[0;32m"
-DARK_GREEN="\033[1;32m"
-GRAY="\033[1;30m"
-LIGHT_GRAY="\033[0;37m"
-CYAN="\033[0;36m"
-LIGHT_CYAN="\033[1;36m"
-NO_COLOUR="\033[0m"
 
 
 # === GENERAL ALIASES === #
@@ -66,13 +54,24 @@ alias gap='git add -p'
 alias gt='git log --oneline --graph --color --all --decorate'
 
 
-# === GIT PS1 HELPERS === #
+# === COLORS === #
 
-function set_prompt {
-  set_git_color
-  set_window_title "${PWD##*/}"
-  enter_directory
-}
+BLUE="\e[0;34m"
+DARK_BLUE="\e[1;34m"
+RED="\e[0;31m"
+DARK_RED="\e[1;31m"
+YELLOW="\e[0;33m"
+GREEN="\e[0;32m"
+DARK_GREEN="\e[1;32m"
+GRAY="\e[1;30m"
+LIGHT_GRAY="\e[0;37m"
+CYAN="\e[0;36m"
+LIGHT_CYAN="\e[1;36m"
+# NO_COLOR="\033[0m"
+NO_COLOR="\e[m"
+
+
+# === GIT PS1 HELPERS === #
 
 function parse_git_branch {
   git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
@@ -89,7 +88,7 @@ function set_git_color {
     git_symbol="⎈"
   elif [[ ! $git_status =~ "working tree clean" ]]; then
     git_color="$RED"
-    git_symbol="☢"
+    git_symbol="◉"
   elif [[ $git_status =~ "Your branch is ahead of" || $git_status =~ "have diverged" ]]; then
     git_color="$BLUE"
     git_symbol="☛"
@@ -113,11 +112,17 @@ function set_window_title {
   esac
 }
 
+function set_prompt {
+  set_git_color
+  set_window_title "${PWD##*/}"
+  enter_directory
+  PS1="\[$GRAY\]\d \t \[$NO_COLOR\]\w \[$CYAN\]\$(__git_ps1 '(%s)') \[$git_color\]$git_symbol\[$NO_COLOR\]\n\[$DARK_GREEN\]=>\[$NO_COLOR\] "
+}
+
 PROMPT_COMMAND=set_prompt
 
-# PS1="\[$DARK_GREEN\]\u\[$NO_COLOUR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOUR\] 💰  "
-
-
+# PS1="\[$DARK_GREEN\]\u\[$NO_COLOR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOR\] 💰  "
+# PS1="\[$GRAY\]\d \t \[$NO_COLOR\]\w \[$CYAN\]\$(__git_ps1 '(%s)') \[\$(echo -e \${git_color})\]\${git_symbol}\[$NO_COLOR\]\n\[$DARK_GREEN\]=>\[$NO_COLOR\] "
 
 # === PATH SETUP === #
 
