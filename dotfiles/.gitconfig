@@ -5,8 +5,6 @@
   editor = vim
 [color]
   ui = true
-[credential]
-  helper = osxkeychain
 [push]
   default = tracking
 [alias]
