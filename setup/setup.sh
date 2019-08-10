@@ -43,6 +43,11 @@ do
   fi
 done
 
+echo "Installing Git completion and helpers"
+
+curl -o ~/.git-completion.bash https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash
+curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+
 echo "Installing Vim plugin manager"
 
 # Set up vim plugin manager
