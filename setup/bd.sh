@@ -9,7 +9,7 @@ if [[ -z $HOMEBREW_GITHUB_API_TOKEN ]]; then
 fi
 
 # Run BD-specific setup
-brew tap shopsmart/bd git@github.com:shopsmart/homebrew-bd.git
+brew tap git@github.com:shopsmart/homebrew-bd.git
 brew install bd
 
 # Base AWS Config
@@ -29,3 +29,9 @@ else
   echo -e "[default]\naws_access_key_id = [REPLACE]\naws_secret_access_key = [REPLACE]" > $CONFIG_FILE
   echo "Be sure to update $CONFIG_FILE with your key and secret"
 fi
+
+mkdir ~/dev
+
+# TODO: pull in toolshed
+
+# TODO: pull down common repos
