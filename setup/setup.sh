@@ -43,7 +43,18 @@ do
   fi
 done
 
-# ln -s $PWD/.vimbundle.local ~/.vimbundle.local
+# TODO: install postgres
+
+echo "Installing NVM, latest node, latest yarn"
+
+# Install NVM
+mkdir ~/.nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+nvm install --lts
+
+curl -o- -L https://yarnpkg.com/install.sh | bash
 
 # echo 'Loading dotmatrix'
 # 
