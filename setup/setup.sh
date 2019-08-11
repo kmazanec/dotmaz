@@ -11,7 +11,7 @@ defaults write -g KeyRepeat -int 1
 
 if [[ -x "$(command -v brew)" ]]; then
   echo "Homebrew already installed, updating"
-#  brew update
+  brew update
 else
   echo "Installing Homebrew..."
   ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
@@ -19,13 +19,11 @@ fi
 
 echo "Installing fav brews..."
 
-#brew install macvim
-# brew install python
-#brew install chruby
-#brew install ruby-install
-# brew install mercurial
-#brew install go
-#brew install redis
+brew install macvim
+brew install chruby
+brew install ruby-install
+brew install go
+brew install redis
 
 echo "Setting up .files"
 
@@ -66,11 +64,4 @@ nvm install --lts
 
 curl -o- -L https://yarnpkg.com/install.sh | bash
 
-# echo 'Loading dotmatrix'
-# 
-# pushd ..
-# git clone https://github.com/hashrocket/dotmatrix.git
-# cd dotmatrix
-# 
-# echo 'Running install script'
-# bin/install
+echo "Done! You may also want to run the bd.sh setup script"
