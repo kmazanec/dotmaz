@@ -145,6 +145,7 @@ export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 # === BRADS DEALS HELPERS === #
 
 export NGINX_DOCKER_HOME="$HOME/dev/toolshed/docker"
+export TOOLSHED_HOME="$HOME/dev/toolshed"
 
 function bds () {
   if [ "$1" == "bf" ]; then

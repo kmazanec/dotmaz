@@ -30,8 +30,44 @@ else
   echo "Be sure to update $CONFIG_FILE with your key and secret"
 fi
 
+echo "Setting up dev resources"
+
 mkdir ~/dev
+cd ~/dev
+git clone git@github.com:shopsmart/toolshed.git
 
-# TODO: pull in toolshed
+git clone git@github.com:shopsmart/alexa-skill.git
+git clone git@github.com:shopsmart/bd.git
+git clone git@github.com:shopsmart/bd_black_friday_admin.git
+git clone git@github.com:shopsmart/bd_content_hub.git
+git clone git@github.com:shopsmart/bd_lint.git
+git clone git@github.com:shopsmart/bd_paid_placements.git
+git clone git@github.com:shopsmart/bd_rails4.git
+git clone git@github.com:shopsmart/bd_resize_service.git
+git clone git@github.com:shopsmart/buypass_api.git
+git clone git@github.com:shopsmart/buypass_web.git
+git clone git@github.com:shopsmart/channels.git
+git clone git@github.com:shopsmart/contests.git
+git clone git@github.com:shopsmart/credit_feed.git
+git clone git@github.com:shopsmart/discussions.git
+git clone git@github.com:shopsmart/engagement_service.git
+git clone git@github.com:shopsmart/feedbuilder.git
+git clone git@github.com:shopsmart/feeds_admin.git
+git clone git@github.com:shopsmart/glogg.git
+git clone git@github.com:shopsmart/imageredirect.git
+git clone git@github.com:shopsmart/lambda-functions.git
+git clone git@github.com:shopsmart/messages.git
+git clone git@github.com:shopsmart/prospects-api.git
+git clone git@github.com:shopsmart/shopsmartidentityserver.git
+git clone git@github.com:shopsmart/shopsmartredirector.git
+git clone git@github.com:shopsmart/sitemap-generator.git
+git clone git@github.com:shopsmart/subscriptions.git
+git clone git@github.com:shopsmart/tracker.git
+git clone git@github.com:shopsmart/user_services.git
+git clone git@github.com:shopsmart/wwwproxy.git
 
-# TODO: pull down common repos
+echo "Running toolshed setup script"
+. ./toolshed/setup/files/bd_setup.sh
+
+echo "Please install Docker for mac: https://hub.docker.com/editions/community/docker-ce-desktop-mac"
+echo "  then continue setup here: https://github.com/shopsmart/toolshed/wiki/Developer-Docker-Setup"
