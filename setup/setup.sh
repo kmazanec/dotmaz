@@ -19,11 +19,13 @@ fi
 
 echo "Installing fav brews..."
 
-brew install macvim
 brew install chruby
-brew install ruby-install
 brew install go
+brew install macvim
+brew install postgresql
+brew install python
 brew install redis
+brew install ruby-install
 
 echo "Setting up .files"
 
@@ -63,5 +65,7 @@ export NVM_DIR="$HOME/.nvm"
 nvm install --lts
 
 curl -o- -L https://yarnpkg.com/install.sh | bash
+
+echo "Remember to set up your .ssh config"
 
 echo "Done! You may also want to run the bd.sh setup script"
