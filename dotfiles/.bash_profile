@@ -31,7 +31,7 @@ alias ls='ls -FGh'
 alias ll='ls -lFGh'
 
 alias bashp='vi ~/.bash_profile'
-alias dotmaz='cd ~/dev/dotfiles/dotmaz'
+alias dotmaz='cd ~/keith/dotmaz'
 alias be="bundle exec "
 alias ba="./bin/app"
 
@@ -148,48 +148,55 @@ export NGINX_DOCKER_HOME="$HOME/dev/toolshed/docker"
 export TOOLSHED_HOME="$HOME/dev/toolshed"
 
 function bds () {
-  if [ "$1" == "bf" ]; then
-    be rails s -p 3004
-  elif [ "$1" == "content" ]; then
-    be rails s -p 3002
-  elif [ "$1" == "credit" ]; then
-    be rails s -p 3009
-  elif [ "$1" == "et_proxy" ]; then
-    foreman start
-  elif [ "$1" == "discussions" ]; then
-    be rails s -p 3007
-  elif [ "$1" == "engagements" ]; then
-    RAILS_ENV=development be unicorn -c config/unicorn.rb -p 3010
-  elif [ "$1" == "placements" ]; then
-    be rails s -p 3005
-  elif [ "$1" == "users" ]; then
-    be rails s -p 3001
-  elif [ "$1" == "www" ]; then
-    be rails s -b 0.0.0.0
-  elif [ "$1" == "feedbuilder" ]; then
-    go run feedbuilder.go
-  elif [ "$1" == "cms" ]; then
-    npm start
-  elif [ "$1" == "image_resize" ]; then
-    be rackup
-  else
-    echo "Unrecognized app name: $1"
-    echo "Options:"
-    echo " - www (3000)"
-    echo " - users (3001)"
-    echo " - content (3002)"
-    echo " - bf (3004)"
-    echo " - placements (3005)"
-    echo " - discussions (3007)"
-    echo " - et_proxy (3008)"
-    echo " - credit (3009)"
-    echo " - engagements (3010)"
-    echo " - feedbuilder (8080)"
-    echo " - cms (8000)"
-    echo " - image_resize (9292)"
+  local dir=""
+  case $1 in
+    www | bd_rai*) dir='bd_rails4' ;;
+    user*) dir='user_services' ;;
+    content* | bd_cont*) dir='bd_content_hub' ;;
+    subscrip*) dir='subscriptions' ;;
+    prospect* | axis | portal) dir='prospects-api' ;;
+    *redirect*) dir='shopsmartredirector' ;;
+    placement* | bd_paid*) dir='bd_paid_placements' ;;
+    feedbu*) dir='feedbuilder' ;;
+    credit*) dir='credit_feed' ;;
+    engagement*) dir='engagement_service' ;;
+    discussion*) dir='discussions' ;;
+    cms | feeds*) dir='feeds_admin' ;;
+    image* | bd_res*) dir='bd_resize_service' ;;
+    buypass*api | bpapi) dir='buypass_api' ;;
+    buypass*web | bpweb) dir='buypass_web' ;;
+    bf | blackfriday) dir='bd_black_friday_admin' ;;
+    channel*) dir='channels' ;;
+    scratch | s*) dir='scratch' ;;
+    *)
+      [[ ! -z "$1" ]] && echo "Unrecognized app name: $1"
+      echo "Options:"
+      echo " ◦ axis"
+      echo " ◦ blackfriday_admin (bf)"
+      echo " ◦ buypass-api (bpapi)"
+      echo " ◦ buypass-web (bpweb)"
+      echo " ◦ channels"
+      echo " ◦ cms"
+      echo " ◦ content"
+      echo " ◦ credit"
+      echo " ◦ discussions"
+      echo " ◦ engagements"
+      echo " ◦ feedbuilder"
+      echo " ◦ image_resize"
+      echo " ◦ placements"
+      echo " ◦ redirector"
+      echo " ◦ scratch"
+      echo " ◦ subscriptions"
+      echo " ◦ users"
+      echo " ◦ www"
+      ;;
+  esac
+
+  if [[ ! -z "$dir" ]]; then
+    cd ~/dev/$dir
+    echo "Changing to: `pwd`"
   fi
 }
-
 
 # ===  EASTER EGGS === #
 
