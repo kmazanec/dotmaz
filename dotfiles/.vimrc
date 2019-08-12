@@ -25,15 +25,8 @@ call plug#end()
 """""""""""""""""""""""""""""""""""""""""""""""""
 
 set background=dark
-" TODO: setup fonts
-" set gfn=MonacoB2:h13
-" colorscheme base16-tomorrow
+set gfn=Monaco:h12
 colorscheme darkblue
-
-" FIXME: is this still necessary?
-" let &t_Co=256
-"
-" TODO: set hook for when NerdTree opens to refresh the tree
 
 " Show line numbers by default
 set nu
