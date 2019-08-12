@@ -31,6 +31,8 @@ colorscheme darkblue
 
 " FIXME: is this still necessary?
 " let &t_Co=256
+"
+" TODO: set hook for when NerdTree opens to refresh the tree
 
 " Show line numbers by default
 set nu
@@ -41,7 +43,6 @@ set cursorline
 set foldmethod=syntax
 
 " NerdTree customization
-nnoremap <Leader>f :NERDTreeToggle<Enter>
 
 let NERDTreeMinimalUI = 1
 let NERDTreeDirArrows = 1
@@ -72,6 +73,10 @@ let vim_markdown_preview_toggle=3
 """""""""""""""""""""""""""""""""""""""""""""""""
 " III. Keybindings
 """""""""""""""""""""""""""""""""""""""""""""""""
+
+" NerdTree shortcuts
+nnoremap <Leader>f :NERDTreeToggle<Enter>
+nnoremap <Leader>r :NERDTreeFind<Enter>:NERDTreeRefreshRoot<Enter>
 
 " Toggle relative line numbers
 nnoremap <Leader>l :set nu rnu!<cr>
