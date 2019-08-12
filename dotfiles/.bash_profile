@@ -24,7 +24,6 @@ enter_directory() {
 
 export BUNDLER_EDITOR="mvim"
 
-
 # === GENERAL ALIASES === #
 
 alias ls='ls -FGh'
@@ -36,7 +35,6 @@ alias be="bundle exec "
 alias ba="./bin/app"
 
 alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
-
 
 # === GIT ALIASES === #
 
@@ -54,23 +52,24 @@ alias gpu='git push origin HEAD -u'
 alias gap='git add -p'
 alias gt='git log --oneline --graph --color --all --decorate'
 
-
 # === COLORS === #
 
-BLUE="\e[0;34m"
-DARK_BLUE="\e[1;34m"
-RED="\e[0;31m"
-DARK_RED="\e[1;31m"
-YELLOW="\e[0;33m"
-GREEN="\e[0;32m"
-DARK_GREEN="\e[1;32m"
-GRAY="\e[1;30m"
-LIGHT_GRAY="\e[0;37m"
-CYAN="\e[0;36m"
-LIGHT_CYAN="\e[1;36m"
-# NO_COLOR="\033[0m"
-NO_COLOR="\e[m"
-
+GRAY="\[\e[0;30m\]"
+GRAY_BLD="\[\e[1;30m\]"
+RED="\[\e[0;31m\]"
+RED_BLD="\[\e[1;31m\]"
+GREEN="\[\e[0;32m\]"
+GREEN_BLD="\[\e[1;32m\]"
+YELLOW="\[\e[0;33m\]"
+YELLOW_BLD="\[\e[1;33m\]"
+BLUE="\[\e[0;34m\]"
+BLUE_BLD="\[\e[1;34m\]"
+VIOLET="\[\e[0;35m\]"
+VIOLET_BLD="\[\e[1;35m\]"
+CYAN="\[\e[0;36m\]"
+CYAN_BLD="\[\e[1;36m\]"
+PLAIN_BLD="\[\e[1;37m\]"
+NO_COLOR="\[\e[m\]"
 
 # === GIT PS1 HELPERS === #
 
@@ -117,12 +116,10 @@ function set_prompt {
   set_git_color
   set_window_title "${PWD##*/}"
   enter_directory
-  PS1="\[$GRAY\]\d \t \[$NO_COLOR\]\w \[$CYAN\]\$(__git_ps1 '(%s)') \[$git_color\]$git_symbol\[$NO_COLOR\]\n\[$DARK_GREEN\]=>\[$NO_COLOR\] "
+  PS1="$GRAY_BLD\d \t $BLUE_BLD\w$CYAN\$(__git_ps1) $git_color$git_symbol$NO_COLOR\n$GREEN_BLD=>$NO_COLOR "
 }
 
 PROMPT_COMMAND=set_prompt
-
-# PS1="\[$GRAY\]\d \t \[$NO_COLOR\]\w \[$CYAN\]\$(__git_ps1 '(%s)') \[\$(echo -e \${git_color})\]\${git_symbol}\[$NO_COLOR\]\n\[$DARK_GREEN\]=>\[$NO_COLOR\] "
 
 # === PATH SETUP === #
 
