@@ -122,26 +122,17 @@ function set_prompt {
 
 PROMPT_COMMAND=set_prompt
 
-# PS1="\[$DARK_GREEN\]\u\[$NO_COLOR\]: \W/\[\$(echo -e \${git_color})\] \${git_symbol}\[$DARK_BLUE\]\$(parse_git_branch)\[$NO_COLOR\] 💰  "
 # PS1="\[$GRAY\]\d \t \[$NO_COLOR\]\w \[$CYAN\]\$(__git_ps1 '(%s)') \[\$(echo -e \${git_color})\]\${git_symbol}\[$NO_COLOR\]\n\[$DARK_GREEN\]=>\[$NO_COLOR\] "
 
 # === PATH SETUP === #
 
 # export GOBIN="$HOME/dev/go/bin"
 # export GOPATH="$HOME/dev/go"
-# export PATH="$HOME/dev/javascript/depot_tools:$PATH"
 # export PATH="$HOME/dev/go/bin:$PATH"
 # export PATH="/usr/local/bin:$PATH"
 # export PATH="/usr/local/go/bin:$PATH"
 # export PATH="/usr/local/opt/go/libexec/bin:$PATH"
-# export PATH="/usr/local/opt/qt@5.5/bin:$PATH"
-export PATH="/Applications/Postgres.app/Contents/Versions/latest/bin:$PATH"
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-
-# Setting PATH for Python 3.4
-# The orginal version is saved in .bash_profile.pysave
-# PATH="/Library/Frameworks/Python.framework/Versions/3.4/bin:${PATH}"
-# export PATH
 
 # === BRADS DEALS HELPERS === #
 
