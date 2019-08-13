@@ -90,6 +90,10 @@ nnoremap <BS> :set hlsearch! hlsearch?<cr>
 vnoremap < <gv
 vnoremap > >gv
 
+" TouchBar
+amenu TouchBar.📂 :NERDTreeToggle<Enter>
+amenu TouchBar.🦞 :Commentary<Enter>
+
 " FIXME: Is this still needed?
 " nnoremap <C-j><C-x> :let b:syntastic_javascript_jscs_args = "-x"
 
