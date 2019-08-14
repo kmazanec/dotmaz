@@ -6,10 +6,14 @@ call plug#begin('~/.vim/plugged')
 
 Plug 'airblade/vim-gitgutter'
 Plug 'ctrlpvim/ctrlp.vim'
+Plug 'editorconfig/editorconfig-vim'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
 Plug 'godlygeek/tabular'
 Plug 'mileszs/ack.vim'
 Plug 'nathanaelkane/vim-indent-guides'
+Plug 'nikvdp/ejs-syntax'
+Plug 'othree/html5.vim'
+Plug 'pangloss/vim-javascript'
 Plug 'scrooloose/nerdtree'
 Plug 'terryma/vim-multiple-cursors'
 Plug 'tpope/vim-commentary'
@@ -26,6 +30,9 @@ call plug#end()
 if executable('ag')
   let g:ackprg = 'ag --vimgrep'
 endif
+
+" Prevent fights between editor config and fugitive
+let g:EditorConfig_exclude_patterns = ['fugitive://.\*']
 
 """""""""""""""""""""""""""""""""""""""""""""""""
 " II. Look and Feel
@@ -102,6 +109,10 @@ nnoremap <BS> :set hlsearch! hlsearch?<cr>
 vnoremap < <gv
 vnoremap > >gv
 
+" Helpers for making gf more useful
+set path+=app/**
+set suffixesadd+=.jst.ejs
+
 " TouchBar
 amenu TouchBar.📂 :NERDTreeToggle<Enter>
 amenu TouchBar.🔎 :Ack!<space>
@@ -114,6 +125,10 @@ amenu TouchBar.🦞 :Commentary<Enter>
 " IV. Linting and Syntax
 """""""""""""""""""""""""""""""""""""""""""""""""
 
+" Ignore some directories from CtrlP fuzzy searching
+let g:ctrlp_custom_ignore = "node_modules"
+
+" Syntastic customization
 let g:syntastic_always_populate_loc_list = 1
 let g:syntastic_auto_loc_list = 2
 let g:syntastic_check_on_open = 0
