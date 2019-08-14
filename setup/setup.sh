@@ -26,6 +26,7 @@ brew install postgresql
 brew install python
 brew install redis
 brew install ruby-install
+brew install the_silver_searcher
 
 echo "Setting up .files"
 

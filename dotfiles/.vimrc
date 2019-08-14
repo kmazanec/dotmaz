@@ -8,6 +8,7 @@ Plug 'airblade/vim-gitgutter'
 Plug 'ctrlpvim/ctrlp.vim'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
 Plug 'godlygeek/tabular'
+Plug 'mileszs/ack.vim'
 Plug 'nathanaelkane/vim-indent-guides'
 Plug 'scrooloose/nerdtree'
 Plug 'terryma/vim-multiple-cursors'
@@ -20,6 +21,11 @@ Plug 'wakatime/vim-wakatime'
 Plug 'xuyuanp/nerdtree-git-plugin'
 
 call plug#end()
+
+" Tell Ack.vim to use Ag under the hood instead
+if executable('ag')
+  let g:ackprg = 'ag --vimgrep'
+endif
 
 """""""""""""""""""""""""""""""""""""""""""""""""
 " II. Look and Feel
@@ -73,6 +79,12 @@ let vim_markdown_preview_toggle=3
 nnoremap <Leader>f :NERDTreeToggle<Enter>
 nnoremap <Leader>r :NERDTreeFind<Enter>:NERDTreeRefreshRoot<Enter>
 
+" Terminal shortcut
+nnoremap <Leader>t :terminal<Enter>source ~/.bash_profile<Enter>
+
+" Search shortcut
+nnoremap <Leader>a :Ack!<space>
+
 " Toggle relative line numbers
 nnoremap <Leader>l :set nu rnu!<cr>
 
@@ -92,6 +104,7 @@ vnoremap > >gv
 
 " TouchBar
 amenu TouchBar.📂 :NERDTreeToggle<Enter>
+amenu TouchBar.🔎 :Ack!<space>
 amenu TouchBar.🦞 :Commentary<Enter>
 
 " FIXME: Is this still needed?
