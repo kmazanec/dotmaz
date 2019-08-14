@@ -60,6 +60,7 @@ git clone git@github.com:shopsmart/glogg.git
 git clone git@github.com:shopsmart/imageredirect.git
 git clone git@github.com:shopsmart/lambda-functions.git
 git clone git@github.com:shopsmart/messages.git
+git clone git@github.com:shopsmart/popularity-revamp.git
 git clone git@github.com:shopsmart/prospects-api.git
 git clone git@github.com:shopsmart/shopsmartidentityserver.git
 git clone git@github.com:shopsmart/shopsmartredirector.git

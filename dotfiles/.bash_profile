@@ -157,7 +157,7 @@ function bds () {
     buypass*web | bpweb) dir='buypass_web' ;;
     bf | blackfriday) dir='bd_black_friday_admin' ;;
     channel*) dir='channels' ;;
-    pop*) dir='popularity_revamp' ;;
+    pop*) dir='popularity-revamp' ;;
     scratch | s*) dir='scratch' ;;
     *)
       [[ ! -z "$1" ]] && echo "Unrecognized app name: $1"
