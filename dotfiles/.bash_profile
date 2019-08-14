@@ -148,6 +148,7 @@ function bds () {
     placement* | bd_paid*) dir='bd_paid_placements' ;;
     feedbu*) dir='feedbuilder' ;;
     credit*) dir='credit_feed' ;;
+    tool*) dir='toolshed' ;;
     engagement*) dir='engagement_service' ;;
     discussion*) dir='discussions' ;;
     cms | feeds*) dir='feeds_admin' ;;
@@ -156,6 +157,7 @@ function bds () {
     buypass*web | bpweb) dir='buypass_web' ;;
     bf | blackfriday) dir='bd_black_friday_admin' ;;
     channel*) dir='channels' ;;
+    pop*) dir='popularity_revamp' ;;
     scratch | s*) dir='scratch' ;;
     *)
       [[ ! -z "$1" ]] && echo "Unrecognized app name: $1"
