@@ -12,8 +12,11 @@ fi
 brew tap git@github.com:shopsmart/homebrew-bd.git
 brew install bd
 
+# Dependency for WWW local dev
+brew install zeromq
+
 # Base AWS Config
-mkdir ~/.aws
+mkdir -p ~/.aws
 
 CONFIG_FILE=~/.aws/config
 if [[ -f $CONFIG_FILE ]]; then
@@ -32,7 +35,7 @@ fi
 
 echo "Setting up dev resources"
 
-mkdir ~/dev
+mkdir -p ~/dev
 cd ~/dev
 git clone git@github.com:shopsmart/toolshed.git
 
