@@ -112,9 +112,20 @@ nnoremap <BS> :set hlsearch! hlsearch?<cr>
 vnoremap < <gv
 vnoremap > >gv
 
+" Window resizing horizontal
+nnoremap <M-=> :resize +4<CR>
+nnoremap <M--> :resize -4<CR>
+
+" Window resizing vertical
+nnoremap <M-[> :vertical resize +4<CR>
+nnoremap <M-]> :vertical resize -4<CR>
+
 " Helpers for making gf more useful
 set path+=app/**
 set suffixesadd+=.jst.ejs
+
+" Allow MacVim to use the meta/alt key on mac
+set macmeta
 
 " TouchBar
 amenu TouchBar.📂 :NERDTreeToggle<Enter>
