@@ -92,6 +92,9 @@ nnoremap <Leader>t :terminal<Enter>source ~/.bash_profile<Enter>
 " Search shortcut
 nnoremap <Leader>a :Ack!<space>
 
+" Show register contents
+nnoremap <Leader>q :reg<Enter>
+
 " Toggle relative line numbers
 nnoremap <Leader>l :set nu rnu!<cr>
 
@@ -115,7 +118,8 @@ set suffixesadd+=.jst.ejs
 
 " TouchBar
 amenu TouchBar.📂 :NERDTreeToggle<Enter>
-amenu TouchBar.🔎 :Ack!<space>
+amenu TouchBar.🔎 :Ack!<Space>
+amenu TouchBar.📋 :reg<Enter>
 amenu TouchBar.🦞 :Commentary<Enter>
 
 " FIXME: Is this still needed?
