@@ -72,8 +72,6 @@ let g:NERDTreeIndicatorMapCustom = {
 let g:indent_guides_enable_on_vim_startup = 1
 let g:indent_guides_start_level = 2
 
-" set statusline=col:\ %c%#warningmsg#%{SyntasticStatuslineFlag()}%*
-
 let vim_markdown_preview_hotkey='<C-m>'
 let vim_markdown_preview_github=1
 let vim_markdown_preview_toggle=3
@@ -150,15 +148,23 @@ let g:syntastic_check_on_open = 0
 let g:syntastic_check_on_wq = 0
 let g:syntastic_aggregate_errors = 1
 
-let g:syntastic_style_error_symbol = "◦"
+let g:syntastic_style_error_symbol = "●"
 let g:syntastic_style_warning_symbol = "◦"
 
 let g:syntastic_error_symbol = "●"
 let g:syntastic_warning_symbol = "◦"
 
+highlight SyntasticErrorSign guifg=red guibg=bg
+highlight SyntasticWarningSign guifg=yellow guibg=bg
+
 " Point syntastic checker at locally installed `eslint` if it exists.
 if executable('./node_modules/.bin/eslint')
   let b:syntastic_javascript_eslint_exec = './node_modules/.bin/eslint'
+endif
+
+" Point syntastic checker at locally installed `jscs` if it exists.
+if executable('./node_modules/.bin/jscs')
+  let b:syntastic_javascript_jscs_exec = './node_modules/.bin/jscs'
 endif
 
 let g:syntastic_ruby_checkers = ["rubocop"]
@@ -166,7 +172,7 @@ let g:syntastic_ruby_checkers = ["rubocop"]
 " let g:syntastic_javascript_checkers = ["eslint"]
 " let g:syntastic_jsx_checkers = ["eslint"]
 
-let g:syntastic_javascript_checkers = ["jshint", "jscs"]
+let g:syntastic_javascript_checkers = ["jscs"]
 let g:syntastic_jsx_checkers = ["eslint"]
 
 " Map alternate file types to correct syntax
