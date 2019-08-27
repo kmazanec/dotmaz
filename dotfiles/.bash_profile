@@ -1,10 +1,7 @@
-if [ -f ~/.git-completion.bash ]; then
-  . ~/.git-completion.bash
-fi
+# === Git, Ruby, Node helpers === #
 
-if [ -f ~/.git-prompt.sh ]; then
-  . ~/.git-prompt.sh
-fi
+[ -f ~/.git-completion.bash ] && . ~/.git-completion.bash
+[ -f ~/.git-prompt.sh ] && . ~/.git-prompt.sh
 
 source /usr/local/opt/chruby/share/chruby/chruby.sh
 source /usr/local/opt/chruby/share/chruby/auto.sh
