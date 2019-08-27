@@ -13,15 +13,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-enter_directory() {
-  if [[ $PWD == $PREV_PWD ]]; then
-    return
-  fi
-
-  PREV_PWD=$PWD
-  [[ -f ".nvmrc" ]] && nvm use
-}
-
 export BUNDLER_EDITOR="mvim"
 
 # === GENERAL ALIASES === #
@@ -115,7 +106,6 @@ function set_window_title {
 function set_prompt {
   set_git_color
   set_window_title "${PWD##*/}"
-  enter_directory
   PS1="$GRAY_BLD\d \t $BLUE_BLD\w$CYAN\$(__git_ps1) $git_color$git_symbol$NO_COLOR\n$GREEN_BLD=>$NO_COLOR "
 }
 
