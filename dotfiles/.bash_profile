@@ -132,17 +132,18 @@ function bds () {
     subscrip*) dir='subscriptions' ;;
     prospect* | axis | portal) dir='prospects-api' ;;
     *redirect*) dir='shopsmartredirector' ;;
-    placement* | bd_paid*) dir='bd_paid_placements' ;;
+    place* | bd_paid*) dir='bd_paid_placements' ;;
     feedbu*) dir='feedbuilder' ;;
     credit*) dir='credit_feed' ;;
     tool*) dir='toolshed' ;;
-    engagement*) dir='engagement_service' ;;
-    discussion*) dir='discussions' ;;
+    wwwp*) dir='wwwproxy' ;;
+    engage*) dir='engagement_service' ;;
+    discus*) dir='discussions' ;;
     cms | feeds*) dir='feeds_admin' ;;
     image* | bd_res*) dir='bd_resize_service' ;;
     buypass*api | bpapi) dir='buypass_api' ;;
     buypass*web | bpweb) dir='buypass_web' ;;
-    bf | blackfriday) dir='bd_black_friday_admin' ;;
+    bf | blackfri*) dir='bd_black_friday_admin' ;;
     channel*) dir='channels' ;;
     pop*) dir='popularity-revamp' ;;
     scratch | s*) dir='scratch' ;;
@@ -167,6 +168,7 @@ function bds () {
       echo " ◦ subscriptions"
       echo " ◦ users"
       echo " ◦ www"
+      echo " ◦ wwwproxy"
       ;;
   esac
 
