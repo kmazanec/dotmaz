@@ -151,7 +151,7 @@ let g:syntastic_check_on_wq = 0
 let g:syntastic_aggregate_errors = 1
 
 let g:syntastic_style_error_symbol = "●"
-let g:syntastic_style_warning_symbol = "◦"
+let g:syntastic_style_warning_symbol = "●"
 
 let g:syntastic_error_symbol = "●"
 let g:syntastic_warning_symbol = "◦"
@@ -169,7 +169,7 @@ if executable('./node_modules/.bin/jscs')
   let b:syntastic_javascript_jscs_exec = './node_modules/.bin/jscs'
 endif
 
-let g:syntastic_ruby_checkers = ["rubocop"]
+let g:syntastic_ruby_checkers = ["mri", "rubocop"]
 
 " let g:syntastic_javascript_checkers = ["eslint"]
 " let g:syntastic_jsx_checkers = ["eslint"]
