@@ -179,6 +179,9 @@ let g:syntastic_ruby_checkers = ["mri", "rubocop"]
 let g:syntastic_javascript_checkers = ["jscs"]
 let g:syntastic_jsx_checkers = ["eslint"]
 
+let g:syntastic_css_checkers = ["sass", "stylelint", "scss_lint"]
+let g:syntastic_scss_checkers = ["sass", "stylelint", "scss_lint"]
+
 " Map alternate file types to correct syntax
 :autocmd BufNewFile,BufRead *.ejs set syntax=jst
 :autocmd BufNewFile,BufRead *.us set syntax=jst
