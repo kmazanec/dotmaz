@@ -12,6 +12,7 @@ Plug 'godlygeek/tabular'
 Plug 'mileszs/ack.vim'
 Plug 'nathanaelkane/vim-indent-guides'
 Plug 'nikvdp/ejs-syntax'
+Plug 'ntpeters/vim-better-whitespace'
 Plug 'othree/html5.vim'
 Plug 'othree/xml.vim'
 Plug 'pangloss/vim-javascript'
@@ -141,6 +142,13 @@ amenu TouchBar.🦞 :Commentary<Enter>
 """""""""""""""""""""""""""""""""""""""""""""""""
 " IV. Linting and Syntax
 """""""""""""""""""""""""""""""""""""""""""""""""
+
+" Strip whitespace on save
+let g:strip_whitespace_on_save = 1
+let g:strip_whitespace_confirm = 0
+
+" Ignore files that are too large
+let g:strip_max_file_size = 1000
 
 " Ignore some directories from CtrlP fuzzy searching
 let g:ctrlp_custom_ignore = "node_modules"
