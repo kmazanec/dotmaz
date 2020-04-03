@@ -79,7 +79,7 @@ function set_git_color {
     git_symbol="◉"
   elif [[ $git_status =~ "Your branch is ahead of" || $git_status =~ "have diverged" ]]; then
     git_color="$BLUE"
-    git_symbol="☛"
+    git_symbol="👉"
   elif [[ $git_status =~ "nothing to commit" ]]; then
     git_color="$GREEN"
     git_symbol="✓"
