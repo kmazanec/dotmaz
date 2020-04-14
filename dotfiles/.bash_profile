@@ -136,6 +136,7 @@ function bds () {
     feedbu*) dir='feedbuilder' ;;
     credit*) dir='credit_feed' ;;
     tool*) dir='toolshed' ;;
+    terr*) dir='terraform' ;;
     wwwp*) dir='wwwproxy' ;;
     engage*) dir='engagement_service' ;;
     discus*) dir='discussions' ;;
@@ -166,6 +167,7 @@ function bds () {
       echo " ◦ redirector"
       echo " ◦ scratch"
       echo " ◦ subscriptions"
+      echo " ◦ terraform"
       echo " ◦ users"
       echo " ◦ www"
       echo " ◦ wwwproxy"

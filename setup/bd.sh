@@ -15,6 +15,9 @@ brew install bd
 # Dependency for WWW local dev
 brew install zeromq
 
+# Terraform CLI
+brew install terraform
+
 # Base AWS Config
 mkdir -p ~/.aws
 
@@ -66,6 +69,7 @@ git clone git@github.com:shopsmart/shopsmartidentityserver.git
 git clone git@github.com:shopsmart/shopsmartredirector.git
 git clone git@github.com:shopsmart/sitemap-generator.git
 git clone git@github.com:shopsmart/subscriptions.git
+git clone git@github.com:shopsmart/terraform.git
 git clone git@github.com:shopsmart/tracker.git
 git clone git@github.com:shopsmart/user_services.git
 git clone git@github.com:shopsmart/wwwproxy.git
