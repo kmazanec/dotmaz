@@ -167,6 +167,8 @@ let g:syntastic_style_warning_symbol = "●"
 let g:syntastic_error_symbol = "●"
 let g:syntastic_warning_symbol = "◦"
 
+let g:javascript_plugin_jsdoc = 1
+
 highlight SyntasticErrorSign guifg=red guibg=bg
 highlight SyntasticWarningSign guifg=yellow guibg=bg
 
