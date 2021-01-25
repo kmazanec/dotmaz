@@ -1,8 +1,8 @@
-#! /bin/bash
+#! /bin/sh
 
 # Run this from the dotmaz project root
 
-echo "Setting up yo machine!"
+echo "Setting up your machine!"
 
 echo "Setting up key repeat preferences"
 
@@ -14,7 +14,7 @@ if [[ -x "$(command -v brew)" ]]; then
   brew update
 else
   echo "Installing Homebrew..."
-  ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 fi
 
 echo "Installing fav brews..."
@@ -61,7 +61,7 @@ echo "Installing NVM, latest node, latest yarn"
 
 # Install NVM
 mkdir -p ~/.nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 nvm install --lts
