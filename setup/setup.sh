@@ -29,6 +29,13 @@ brew install ruby-install
 brew install the_silver_searcher
 brew install inetutils
 
+echo "Installing oh my zsh"
+
+sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+# Move the default .zshrc file that comes with oh-my-zsh in favor of the one in this repo
+mv ~/.zshrc ~/.zshrc.default
+
 echo "Setting up .files"
 
 for f in $PWD/dotfiles/.*
@@ -69,5 +76,5 @@ nvm install --lts
 curl -o- -L https://yarnpkg.com/install.sh | bash
 
 echo "Remember to set up your .ssh config"
-
+echo "Key repeat preferences may require a restart to take effect."
 echo "Done! You may also want to run the bd.sh setup script"
