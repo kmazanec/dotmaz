@@ -20,3 +20,5 @@
   trim = !sh -c 'git branch --merged | grep -v \"\\*\" | grep -v master | grep -v dev | xargs -n 1 git branch -d'
 [url "git@github.com:"]
   insteadOf = https://github.com/
+[pull]
+	rebase = false
