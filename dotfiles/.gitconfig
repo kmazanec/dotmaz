@@ -9,6 +9,7 @@
 [push]
   default = tracking
 [alias]
+  ap = add -p
   co = checkout
   doff = reset HEAD^
   tree = log --graph --oneline --decorate --color --all
