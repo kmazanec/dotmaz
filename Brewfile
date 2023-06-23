@@ -1,0 +1,10 @@
+brew "chruby"
+brew "go"
+brew "macvim"
+brew "python"
+brew "redis"
+brew "ruby-install"
+brew "the_silver_searcher"
+brew "ienetutils"
+
+tap "shopsmart/bd"

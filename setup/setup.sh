@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/zsh
 
 # Run this from the dotmaz project root
 
@@ -9,7 +9,7 @@ echo "Setting up key repeat preferences"
 defaults write -g InitialKeyRepeat -int 12
 defaults write -g KeyRepeat -int 1
 
-if [[ -x "$(command -v brew)" ]]; then
+if command -v brew &> /dev/null; then
   echo "Homebrew already installed, updating"
   brew update
 else
@@ -19,27 +19,21 @@ fi
 
 echo "Installing fav brews..."
 
-brew install chruby
-brew install go
-brew install macvim
-brew install postgresql
-brew install python
-brew install redis
-brew install ruby-install
-brew install the_silver_searcher
-brew install inetutils
+brew bundle --file=../Brewfile
 
 echo "Installing oh my zsh"
 
-sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+zsh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Move the default .zshrc file that comes with oh-my-zsh in favor of the one in this repo
 mv ~/.zshrc ~/.zshrc.default
 
+# Enable dotglob option to include dotfiles
+setopt dotglob
+
 echo "Setting up .files"
 
-for f in $PWD/dotfiles/.*
-do
+for f in $PWD/dotfiles/.*; do
   if [[ -f $f ]]; then
     fname=$(basename $f)
     echo "Linking $fname"
@@ -52,6 +46,9 @@ do
   fi
 done
 
+# Disable dotglob option
+unsetopt dotglob
+
 echo "Installing Git completion and helpers"
 
 curl -o ~/.git-completion.bash https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash
@@ -61,8 +58,6 @@ echo "Installing Vim plugin manager"
 
 # Set up vim plugin manager
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
-
-# TODO: install postgres
 
 echo "Installing NVM, latest node, latest yarn"
 
