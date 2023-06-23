@@ -130,13 +130,13 @@ set path+=app/**
 set suffixesadd+=.jst.ejs
 
 " Allow MacVim to use the meta/alt key on mac
-set macmeta
+" set macmeta
 
 " TouchBar
-amenu TouchBar.📂 :NERDTreeToggle<Enter>
-amenu TouchBar.🔎 :Ack!<Space>
-amenu TouchBar.📋 :reg<Enter>
-amenu TouchBar.🦞 :Commentary<Enter>
+" amenu TouchBar.📂 :NERDTreeToggle<Enter>
+" amenu TouchBar.🔎 :Ack!<Space>
+" amenu TouchBar.📋 :reg<Enter>
+" amenu TouchBar.🦞 :Commentary<Enter>
 
 " FIXME: Is this still needed?
 " nnoremap <C-j><C-x> :let b:syntastic_javascript_jscs_args = "-x"
