@@ -28,14 +28,6 @@ else
   echo -e "[default]\nregion = us-east-1" > $CONFIG_FILE
 fi
 
-CONFIG_FILE=~/.aws/credentials
-if [[ -f $CONFIG_FILE ]]; then
-  echo "$CONFIG_FILE exists, skipping"
-else
-  echo -e "[default]\naws_access_key_id = [REPLACE]\naws_secret_access_key = [REPLACE]" > $CONFIG_FILE
-  echo "Be sure to update $CONFIG_FILE with your key and secret"
-fi
-
 echo "Setting up dev resources"
 
 mkdir -p ~/dev

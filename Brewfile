@@ -1,3 +1,4 @@
+brew "awscli"
 brew "chruby"
 brew "go"
 brew "macvim"
