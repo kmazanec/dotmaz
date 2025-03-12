@@ -8,6 +8,7 @@ echo "Setting up key repeat preferences"
 
 defaults write -g InitialKeyRepeat -int 12
 defaults write -g KeyRepeat -int 1
+defaults write -g ApplePressAndHoldEnabled -bool false
 
 if command -v brew &> /dev/null; then
   echo "Homebrew already installed, updating"
