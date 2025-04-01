@@ -7,5 +7,6 @@ brew "redis"
 brew "ruby-install"
 brew "the_silver_searcher"
 brew "ienetutils"
+brew "watchman"
+brew "imagemagick"
 
-tap "shopsmart/bd"
