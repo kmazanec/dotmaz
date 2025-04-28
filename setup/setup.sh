@@ -73,4 +73,4 @@ curl -o- -L https://yarnpkg.com/install.sh | bash
 
 echo "Remember to set up your .ssh config"
 echo "Key repeat preferences may require a restart to take effect."
-echo "Done! You may also want to run the bd.sh setup script"
+echo "Done!"

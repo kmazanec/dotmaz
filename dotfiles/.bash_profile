@@ -118,68 +118,6 @@ PROMPT_COMMAND=set_prompt
 # export PATH="/usr/local/opt/go/libexec/bin:$PATH"
 export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
 
-# === BRADS DEALS HELPERS === #
-
-export NGINX_DOCKER_HOME="$HOME/dev/toolshed/docker"
-export TOOLSHED_HOME="$HOME/dev/toolshed"
-
-function bds () {
-  local dir=""
-  case $1 in
-    www | bd_rai*) dir='bd_rails4' ;;
-    user*) dir='user_services' ;;
-    content* | bd_cont*) dir='bd_content_hub' ;;
-    subscrip*) dir='subscriptions' ;;
-    prospect* | axis | portal) dir='prospects-api' ;;
-    *redirect*) dir='shopsmartredirector' ;;
-    place* | bd_paid*) dir='bd_paid_placements' ;;
-    feedbu*) dir='feedbuilder' ;;
-    credit*) dir='credit_feed' ;;
-    tool*) dir='toolshed' ;;
-    terr*) dir='terraform' ;;
-    wwwp*) dir='wwwproxy' ;;
-    engage*) dir='engagement_service' ;;
-    discus*) dir='discussions' ;;
-    cms | feeds*) dir='feeds_admin' ;;
-    image* | bd_res*) dir='bd_resize_service' ;;
-    buypass*api | bpapi) dir='buypass_api' ;;
-    buypass*web | bpweb) dir='buypass_web' ;;
-    bf | blackfri*) dir='bd_black_friday_admin' ;;
-    channel*) dir='channels' ;;
-    pop*) dir='popularity-revamp' ;;
-    scratch | s*) dir='scratch' ;;
-    *)
-      [[ ! -z "$1" ]] && echo "Unrecognized app name: $1"
-      echo "Options:"
-      echo " ◦ axis"
-      echo " ◦ blackfriday_admin (bf)"
-      echo " ◦ buypass-api (bpapi)"
-      echo " ◦ buypass-web (bpweb)"
-      echo " ◦ channels"
-      echo " ◦ cms"
-      echo " ◦ content"
-      echo " ◦ credit"
-      echo " ◦ discussions"
-      echo " ◦ engagements"
-      echo " ◦ feedbuilder"
-      echo " ◦ image_resize"
-      echo " ◦ placements"
-      echo " ◦ redirector"
-      echo " ◦ scratch"
-      echo " ◦ subscriptions"
-      echo " ◦ terraform"
-      echo " ◦ users"
-      echo " ◦ www"
-      echo " ◦ wwwproxy"
-      ;;
-  esac
-
-  if [[ ! -z "$dir" ]]; then
-    cd ~/dev/$dir
-    echo "Changing to: `pwd`"
-  fi
-}
-
 # ===  EASTER EGGS === #
 
 read -d '' Lobster <<"EOF"
