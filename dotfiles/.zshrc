@@ -101,6 +101,35 @@ fi
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 #
+# === GENERAL ALIASES === #
+
+alias ls='ls -FGh'
+alias ll='ls -lFGh'
+
+alias dotmaz='cd ~/keith/dotmaz'
+alias be="bundle exec "
+alias ba="./bin/compose"
+alias bce="./bin/compose-exec"
+
+alias getip='dig +short myip.opendns.com @resolver1.opendns.com'
+
+# === GIT ALIASES === #
+
+alias gst='git status '
+alias ga='git add '
+alias gb='git branch '
+alias gc='git commit'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gco='git checkout '
+alias gk='gitk --all&'
+alias gx='gitx --all'
+alias gp='git push '
+alias gpu='git push origin HEAD -u'
+alias gap='git add -p'
+alias gt='git log --oneline --graph --color --all --decorate'
+
+#
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 # pnpm
