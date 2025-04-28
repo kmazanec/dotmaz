@@ -100,3 +100,16 @@ fi
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+#
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+
+# pnpm
+# export PNPM_HOME="/Users/keith/Library/pnpm"
+# export PATH="$PNPM_HOME:$PATH"
+# pnpm end
+
+# chruby
+source /opt/homebrew/opt/chruby/share/chruby/chruby.sh
+source /opt/homebrew/opt/chruby/share/chruby/auto.sh
+# chruby end
+#
