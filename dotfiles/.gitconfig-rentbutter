@@ -1,0 +1,21 @@
+[user]
+  name = Keith Mazanec
+  email = kmazanec@rentbutter.com
+
+[branch]
+  autoSetupRebase = always
+  autoSetupMerge = always
+
+[branch "development"]
+  rebase = true
+
+[branch "master"]
+  rebase = true
+
+[pull]
+  rebase = merges
+
+[rebase]
+  autosquash = true
+  autostash = true
+  abortOnConflict = true
