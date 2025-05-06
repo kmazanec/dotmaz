@@ -129,7 +129,7 @@ alias gpu='git push origin HEAD -u'
 alias gap='git add -p'
 alias gt='git log --oneline --graph --color --all --decorate'
 
-#
+# Docker
 export DOCKER_DEFAULT_PLATFORM=linux/amd64
 
 # pnpm
