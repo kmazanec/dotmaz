@@ -1,20 +1,30 @@
 [user]
   name = Keith Mazanec
   email = k.mazanec@gmail.com
+  signingkey = ~/.ssh/id_ed25519.pub
 
-[includeIf "gitdir:~/rentbutter/"]
-  path = ~/.gitconfig-rentbutter
+[url "git@github.com:"]
+  insteadOf = https://github.com/
+
+[gpg]
+  format = ssh
 
 [core]
   editor = vim
   excludesfile = ~/.gitignore
 
-[color]
-  ui = true
+[commit]
+  gpgsign = true
 
 [push]
   default = current
   autoSetupRemote = true
+
+[pull]
+  rebase = false
+
+[color]
+  ui = true
 
 [alias]
   ap = add -p
@@ -28,8 +38,6 @@
   dump = cat-file -p
   trim = !sh -c 'git branch --merged | grep -v \"\\*\" | grep -v master | grep -v dev | xargs -n 1 git branch -d'
 
-[url "git@github.com:"]
-  insteadOf = https://github.com/
+[includeIf "gitdir:~/rentbutter/"]
+  path = ~/.gitconfig-rentbutter
 
-[pull]
-  rebase = false
