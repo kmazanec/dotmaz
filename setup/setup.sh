@@ -71,6 +71,6 @@ nvm install --lts
 
 curl -o- -L https://yarnpkg.com/install.sh | bash
 
-echo "Remember to set up your .ssh config"
+echo "Remember to set up your .ssh config, create new keys, and set up signed commits"
 echo "Key repeat preferences may require a restart to take effect."
 echo "Done!"
