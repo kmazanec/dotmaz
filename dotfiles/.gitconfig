@@ -1,6 +1,6 @@
 [user]
   name = Keith Mazanec
-  email = k.mazanec@gmail.com
+  email = keith@devforward.com
   signingkey = ~/.ssh/id_ed25519.pub
 
 [url "git@github.com:"]

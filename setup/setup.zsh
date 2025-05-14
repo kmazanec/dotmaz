@@ -12,8 +12,12 @@ defaults write -g InitialKeyRepeat -int 12
 defaults write -g KeyRepeat -int 1
 defaults write -g ApplePressAndHoldEnabled -bool false
 
-if command -v brew &> /dev/null; then
+if command -v brew &> /dev/null || [ -f "/opt/homebrew/bin/brew" ]; then
   echo "Homebrew already installed, updating"
+  if ! command -v brew &> /dev/null && [ -f "/opt/homebrew/bin/brew" ]; then
+    echo "Homebrew is installed but not in PATH, adding it..."
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  fi
   brew update
 else
   echo "Installing Homebrew..."
@@ -22,14 +26,21 @@ fi
 
 echo "Installing fav brews..."
 
-brew bundle --file=../Brewfile
+brew bundle --file=./Brewfile
 
 echo "Installing oh my zsh"
 
-zsh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+if [ -d "${HOME}/.oh-my-zsh" ]; then
+  echo "oh-my-zsh is already installed"
+else
+  echo "Installing oh-my-zsh..."
+  zsh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
 
-# Move the default .zshrc file that comes with oh-my-zsh in favor of the one in this repo
-mv ~/.zshrc ~/.zshrc.default
+# Only move the default .zshrc if it exists and isn't already moved
+if [ -f ~/.zshrc ] && [ ! -f ~/.zshrc.default ]; then
+  mv ~/.zshrc ~/.zshrc.default
+fi
 
 # Enable dotglob option to include dotfiles
 setopt dotglob
@@ -39,11 +50,16 @@ echo "Setting up .files"
 for f in $PWD/dotfiles/.*; do
   if [[ -f $f ]]; then
     fname=$(basename $f)
-    echo "Linking $fname"
-
-    if [[ -f ~/$fname && ! -L ~/$fname ]]; then
-      mv ~/$fname ~/$fname.local
+    
+    # Check if symbolic link already exists
+    if [[ -L ~/$fname ]]; then
+      echo "✅ $fname is already linked"
     else
+      echo "Linking $fname"
+      # If regular file exists, back it up before linking
+      if [[ -f ~/$fname ]]; then
+        mv ~/$fname ~/$fname.local
+      fi
       ln -s $f ~/$fname
     fi
   fi
@@ -54,31 +70,65 @@ unsetopt dotglob
 
 echo "Installing Git completion and helpers"
 
-curl -o ~/.git-completion.bash https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash
-curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+if [ ! -f ~/.git-completion.bash ]; then
+  echo "Downloading git-completion.bash..."
+  curl -o ~/.git-completion.bash https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash
+else
+  echo "✅ git-completion.bash already exists"
+fi
+
+if [ ! -f ~/.git-prompt.sh ]; then
+  echo "Downloading git-prompt.sh..."
+  curl -o ~/.git-prompt.sh https://raw.githubusercontent.com/git/git/master/contrib/completion/git-prompt.sh
+else
+  echo "✅ git-prompt.sh already exists"
+fi
 
 echo "Installing Vim plugin manager"
 
-# Set up vim plugin manager
-curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+if [ ! -f ~/.vim/autoload/plug.vim ]; then
+  echo "Installing Vim plugin manager..."
+  curl -fLo ~/.vim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+else
+  echo "✅ Vim plugin manager already installed"
+fi
 
 echo "Installing NVM, latest node, latest yarn"
 
 # Install NVM
-mkdir -p ~/.nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash
+if [ ! -d "$HOME/.nvm" ]; then
+  echo "Installing NVM..."
+  mkdir -p ~/.nvm
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash
+else
+  echo "✅ NVM already installed"
+fi
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-nvm install --lts
 
-curl -o- -L https://yarnpkg.com/install.sh | bash
+if ! command -v node &> /dev/null; then
+  echo "Installing Node LTS..."
+  nvm install --lts
+else
+  echo "✅ Node already installed"
+fi
+
+if ! command -v yarn &> /dev/null; then
+  echo "Installing Yarn..."
+  curl -o- -L https://yarnpkg.com/install.sh | bash
+else
+  echo "✅ Yarn already installed"
+fi
+
+SCRIPT_DIR="$(dirname "$0")"
 
 echo "🚀 Running SSH and Signed Commit setup..."
-zsh ./setup_ssh.zsh
+zsh "${SCRIPT_DIR}/setup_ssh.zsh"
 echo "✅ SSH setup complete."
 
 echo "🚀 Running MCP server setup..."
-zsh ./install_mcp_servers.zsh
+zsh "${SCRIPT_DIR}/install_mcp_servers.zsh"
 echo "✅ MCP setup complete."
 
 echo ""

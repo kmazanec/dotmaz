@@ -6,7 +6,7 @@ brew "python"
 brew "redis"
 brew "ruby-install"
 brew "the_silver_searcher"
-brew "ienetutils"
+brew "inetutils"
 brew "watchman"
 brew "imagemagick"
 
