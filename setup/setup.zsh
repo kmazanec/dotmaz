@@ -131,6 +131,10 @@ echo "🚀 Running MCP server setup..."
 zsh "${SCRIPT_DIR}/install_mcp_servers.zsh"
 echo "✅ MCP setup complete."
 
+echo "🚀 Running Cursor setup..."
+zsh "${SCRIPT_DIR}/setup_cursor.zsh"
+echo "✅ Cursor setup complete."
+
 echo ""
 echo "Key repeat preferences may require a restart to take effect."
 echo "✅ Done!"
