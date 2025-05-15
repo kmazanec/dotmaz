@@ -28,34 +28,32 @@ else
   ln -s "$PWD/dotfiles/cursor/settings.json" ~/Library/Application\ Support/Cursor/User/settings.json
 fi
 
-# Link plugins file
-if [ -f ~/Library/Application\ Support/Cursor/User/plugins.json ]; then
-  echo "✅ Cursor plugins already exist"
+# Link extensions file
+if [ -f ~/Library/Application\ Support/Cursor/User/extensions.json ]; then
+  echo "✅ Cursor extensions already exist"
 else
-  echo "Linking Cursor plugins..."
-  ln -s "$PWD/dotfiles/cursor/plugins.json" ~/Library/Application\ Support/Cursor/User/plugins.json
+  echo "Linking Cursor extensions..."
+  ln -s "$PWD/dotfiles/cursor/extensions.json" ~/Library/Application\ Support/Cursor/User/extensions.json
 fi
 
-# Install plugins if plugins.json exists
-if [ -f "$PWD/dotfiles/cursor/plugins.json" ]; then
-  echo "Installing Cursor plugins..."
-  # Read plugins from the JSON file and install them
-  # Note: This assumes the plugins.json is in a format that can be parsed by jq
-  # You might need to adjust this based on the actual format of your plugins.json
+# Install extensions if extensions.json exists
+if [ -f "$PWD/dotfiles/cursor/extensions.json" ]; then
+  echo "Installing Cursor extensions..."
+  # Read extensions from the JSON file and install them
   if command -v jq &> /dev/null; then
-    plugins=$(jq -r '.plugins[]' "$PWD/dotfiles/cursor/plugins.json" 2>/dev/null)
+    extensions=$(jq -r '.extensions[]' "$PWD/dotfiles/cursor/extensions.json" 2>/dev/null)
     if [ $? -eq 0 ]; then
-      for plugin in $plugins; do
-        echo "Installing plugin: $plugin"
-        # Note: You'll need to replace this with the actual command to install plugins
-        # This is a placeholder as the actual plugin installation command might vary
-        cursor --install-extension "$plugin"
+      for extension in $extensions; do
+        echo "Installing extension: $extension"
+        # Note: You'll need to replace this with the actual command to install extensions
+        # This is a placeholder as the actual extension installation command might vary
+        cursor --install-extension "$extension"
       done
     else
-      echo "⚠️ Could not parse plugins.json, skipping plugin installation"
+      echo "⚠️ Could not parse extensions.json, skipping extension installation"
     fi
   else
-    echo "⚠️ jq not found, skipping plugin installation"
+    echo "⚠️ jq not found, skipping extension installation"
   fi
 fi
 

@@ -3,9 +3,9 @@
 set -e
 
 CURSOR_SETTINGS_SOURCE="$HOME/Library/Application Support/Cursor/User/settings.json"
-CURSOR_PLUGINS_SOURCE="$HOME/Library/Application Support/Cursor/User/plugins.json"
+CURSOR_EXTENSIONS_SOURCE="$HOME/Library/Application Support/Cursor/User/extensions.json"
 DOTFILES_SETTINGS_DEST="$PWD/dotfiles/cursor/settings.json"
-DOTFILES_PLUGINS_DEST="$PWD/dotfiles/cursor/plugins.json"
+DOTFILES_EXTENSIONS_DEST="$PWD/dotfiles/cursor/extensions.json"
 
 # Function to handle file export
 export_file() {
@@ -41,5 +41,5 @@ export_file() {
 # Export settings
 export_file "$CURSOR_SETTINGS_SOURCE" "$DOTFILES_SETTINGS_DEST" "settings"
 
-# Export plugins
-export_file "$CURSOR_PLUGINS_SOURCE" "$DOTFILES_PLUGINS_DEST" "plugins" 
+# Export extensions
+export_file "$CURSOR_EXTENSIONS_SOURCE" "$DOTFILES_EXTENSIONS_DEST" "extensions" 
