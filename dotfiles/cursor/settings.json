@@ -1,20 +1,14 @@
 {
-  "editor.fontFamily": "JetBrains Mono",
-  "editor.fontSize": 14,
-  "editor.lineHeight": 1.5,
-  "editor.tabSize": 2,
-  "editor.insertSpaces": true,
-  "editor.wordWrap": "on",
-  "editor.minimap.enabled": true,
-  "editor.bracketPairColorization.enabled": true,
-  "editor.guides.bracketPairs": true,
-  "editor.suggestSelection": "first",
-  "editor.formatOnSave": true,
-  "editor.formatOnPaste": true,
-  "files.autoSave": "afterDelay",
-  "files.autoSaveDelay": 1000,
-  "terminal.integrated.fontFamily": "JetBrains Mono",
-  "terminal.integrated.fontSize": 14,
-  "workbench.colorTheme": "One Dark Pro",
-  "workbench.iconTheme": "material-icon-theme"
-} 
+    "window.commandCenter": 1,
+    "editor.acceptSuggestionOnCommitCharacter": false,
+    "keyboard.dispatch": "keyCode",
+    "vim.useSystemClipboard": true,
+    "vim.handleKeys": {
+        "<C-d>": true,
+        "<C-s>": false,
+        "<C-z>": false
+    },
+    "files.trimTrailingWhitespace": true,
+    "files.trimFinalNewlines": true,
+    "files.insertFinalNewline": true
+}
