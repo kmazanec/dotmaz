@@ -28,25 +28,24 @@ else
   ln -s "$PWD/dotfiles/cursor/settings.json" ~/Library/Application\ Support/Cursor/User/settings.json
 fi
 
-# Link extensions.json if it exists
-if [ -f "$PWD/dotfiles/cursor/extensions.json" ]; then
-  if [ -f ~/Library/Application\ Support/Cursor/User/extensions.json ]; then
-    echo "✅ Cursor extensions.json already exists"
-  else
-    echo "Linking Cursor extensions.json..."
-    ln -s "$PWD/dotfiles/cursor/extensions.json" ~/Library/Application\ Support/Cursor/User/extensions.json
-  fi
-fi
-
-# Set up extensions directory
-if [ -d "$PWD/dotfiles/cursor/extensions" ]; then
-  echo "Setting up Cursor extensions..."
+# Install extensions from list
+if [ -f "$PWD/dotfiles/cursor/extensions.txt" ]; then
+  echo "Installing Cursor extensions..."
+  
+  # Create extensions directory if it doesn't exist
   mkdir -p ~/.cursor/extensions
   
-  # Copy extensions
-  echo "Copying extensions..."
-  cp -R "$PWD/dotfiles/cursor/extensions"/* ~/.cursor/extensions/
-  echo "✅ Extensions copied successfully!"
+  # Read and install each extension
+  while IFS= read -r extension_id; do
+    if [ -n "$extension_id" ]; then
+      echo "Installing extension: $extension_id"
+      # Note: You'll need to replace this with the actual command to install extensions
+      # This is a placeholder as the actual extension installation command might vary
+      cursor --install-extension "$extension_id"
+    fi
+  done < "$PWD/dotfiles/cursor/extensions.txt"
+  
+  echo "✅ Extensions installation complete!"
 fi
 
 echo "✅ Cursor setup complete!"
