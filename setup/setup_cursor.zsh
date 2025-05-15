@@ -28,33 +28,25 @@ else
   ln -s "$PWD/dotfiles/cursor/settings.json" ~/Library/Application\ Support/Cursor/User/settings.json
 fi
 
-# Link extensions file
-if [ -f ~/Library/Application\ Support/Cursor/User/extensions.json ]; then
-  echo "✅ Cursor extensions already exist"
-else
-  echo "Linking Cursor extensions..."
-  ln -s "$PWD/dotfiles/cursor/extensions.json" ~/Library/Application\ Support/Cursor/User/extensions.json
+# Link extensions.json if it exists
+if [ -f "$PWD/dotfiles/cursor/extensions.json" ]; then
+  if [ -f ~/Library/Application\ Support/Cursor/User/extensions.json ]; then
+    echo "✅ Cursor extensions.json already exists"
+  else
+    echo "Linking Cursor extensions.json..."
+    ln -s "$PWD/dotfiles/cursor/extensions.json" ~/Library/Application\ Support/Cursor/User/extensions.json
+  fi
 fi
 
-# Install extensions if extensions.json exists
-if [ -f "$PWD/dotfiles/cursor/extensions.json" ]; then
-  echo "Installing Cursor extensions..."
-  # Read extensions from the JSON file and install them
-  if command -v jq &> /dev/null; then
-    extensions=$(jq -r '.extensions[]' "$PWD/dotfiles/cursor/extensions.json" 2>/dev/null)
-    if [ $? -eq 0 ]; then
-      for extension in $extensions; do
-        echo "Installing extension: $extension"
-        # Note: You'll need to replace this with the actual command to install extensions
-        # This is a placeholder as the actual extension installation command might vary
-        cursor --install-extension "$extension"
-      done
-    else
-      echo "⚠️ Could not parse extensions.json, skipping extension installation"
-    fi
-  else
-    echo "⚠️ jq not found, skipping extension installation"
-  fi
+# Set up extensions directory
+if [ -d "$PWD/dotfiles/cursor/extensions" ]; then
+  echo "Setting up Cursor extensions..."
+  mkdir -p ~/.cursor/extensions
+  
+  # Copy extensions
+  echo "Copying extensions..."
+  cp -R "$PWD/dotfiles/cursor/extensions"/* ~/.cursor/extensions/
+  echo "✅ Extensions copied successfully!"
 fi
 
 echo "✅ Cursor setup complete!"
