@@ -27,6 +27,8 @@ echo ""
 if [ ! -f "${SSH_KEY}" ]; then
   echo "🔐 Generating new SSH key..."
   ssh-keygen -t ed25519 -C "${GIT_EMAIL}" -f "${SSH_KEY}" -N ""
+  echo "🔑 Adding key to SSH keychain..."
+  ssh-add "${SSH_KEY}"
 else
   echo "✅ SSH key already exists at ${SSH_KEY}"
 fi
