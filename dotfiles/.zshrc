@@ -142,3 +142,13 @@ source /opt/homebrew/opt/chruby/share/chruby/chruby.sh
 source /opt/homebrew/opt/chruby/share/chruby/auto.sh
 # chruby end
 #
+# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+fpath=(/Users/keith/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
+# End of Docker CLI completions
+#
+# Postgres
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+export PKG_CONFIG_PATH="/opt/homebrew/opt/libpq/lib/pkgconfig:$PKG_CONFIG_PATH"
+#
