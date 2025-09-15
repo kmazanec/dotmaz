@@ -1,5 +1,5 @@
 brew "awscli"
-brew "chruby"
+brew "rbenv"
 brew "go"
 brew "macvim"
 brew "python"

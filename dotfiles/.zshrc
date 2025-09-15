@@ -137,11 +137,6 @@ export DOCKER_DEFAULT_PLATFORM=linux/amd64
 # export PATH="$PNPM_HOME:$PATH"
 # pnpm end
 
-# chruby
-source /opt/homebrew/opt/chruby/share/chruby/chruby.sh
-source /opt/homebrew/opt/chruby/share/chruby/auto.sh
-# chruby end
-#
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
 fpath=(/Users/keith/.docker/completions $fpath)
 autoload -Uz compinit
