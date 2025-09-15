@@ -9,4 +9,7 @@ brew "the_silver_searcher"
 brew "inetutils"
 brew "watchman"
 brew "imagemagick"
+brew "postgresql@17"
+brew "libpq"
+brew "ngrok"
 
