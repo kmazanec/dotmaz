@@ -145,3 +145,5 @@ alias lobster='echo $(tput setaf 1)"${Lobster}"'
 [ ! -f "$HOME/.bash_profile.local" ] || . "$HOME/.bash_profile.local"
 
 . "$HOME/.cargo/env"
+
+export PATH="/Users/keith/.local/share/solana/install/active_release/bin:$PATH"

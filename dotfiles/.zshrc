@@ -176,3 +176,18 @@ load-nvmrc() {
 add-zsh-hook chpwd load-nvmrc
 load-nvmrc
 
+# Load direnv
+eval "$(direnv hook zsh)"
+
+export PATH="$HOME/.local/bin:$PATH"
+
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+# --- Solana cluster switcher (added by Claude Code) ---
+# Agave CLI has no config env var, so switching = copying a saved profile
+# into the active config.yml. Affects all tools (solana, anchor, scripts).
+sol-local()  { cp "$HOME/.config/solana/cli/config-local.yml"  "$HOME/.config/solana/cli/config.yml"; echo "→ localhost"; solana config get; }
+sol-devnet() { cp "$HOME/.config/solana/cli/config-devnet.yml" "$HOME/.config/solana/cli/config.yml"; echo "→ devnet";    solana config get; }
+sol-which()  { solana config get | grep 'RPC URL'; }
+# --- end Solana cluster switcher ---
