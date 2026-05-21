@@ -47,7 +47,7 @@ let g:EditorConfig_exclude_patterns = ['fugitive://.\*']
 
 set background=dark
 set gfn=Monaco:h12
-colorscheme darkblue
+colorscheme zaibatsu
 
 " Show line numbers by default
 set nu
