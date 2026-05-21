@@ -44,3 +44,6 @@
 [includeIf "gitdir:~/clients/rentbutter/"]
   path = ~/.gitconfig-rentbutter
 
+[includeIf "gitdir:~/dev/gauntlet/"]
+  path = ~/.gitconfig-gauntlet
+
