@@ -47,7 +47,15 @@ each thread closing.
 For each fix: make the change, run the relevant tests, and reply on the thread linking
 to the commit that addressed it. For each respond/defer: post the reply and explain.
 
-Mark each thread resolved as it's closed (the reviewer can re-open if not satisfied).
+**Resolving the threads is your job — it is a core part of this skill, not an optional
+courtesy and not something to ask permission for.** As each thread is addressed (fixed,
+responded, or deferred with a linked follow-up), mark it **resolved** via the forge API
+— for GitLab: `glab api --method PUT "projects/<o>%2F<r>/merge_requests/<n>/discussions/<id>?resolved=true"`
+(fetch discussion ids from `.../merge_requests/<n>/discussions`); for GitHub: resolve the
+review thread. Resolving the reviewer's own threads (including an AI review bot's) is
+expected workflow — do not stop to confirm it. The reviewer can always re-open if not
+satisfied. A review round is not done until the threads it raised are resolved (or
+explicitly left open with a stated reason, e.g. a deferral the reviewer must sign off on).
 
 ### Step 4 — Capture durable lessons (the Compound step)
 
@@ -95,6 +103,12 @@ Push the fix commits and the doc-propagation commits. The propagation commits sh
 be separate from the code fixes so the diff is readable. Reply on the PR with a
 short summary comment naming the propagated lessons (so the reviewer sees their
 feedback compounded, not just locally absorbed).
+
+**Confirm every addressed thread is marked resolved** (Step 3) before you consider the
+round done — a green re-review with the threads still flagged "unresolved" leaves the MR
+showing blocking discussions. If a force-push/rebase re-triggered the reviewer and it came
+back clean, that confirms the fixes landed: resolve the original threads. This is the
+agent's responsibility; don't defer it to the user.
 
 Do not re-request review automatically; the reviewer will look when ready.
 
