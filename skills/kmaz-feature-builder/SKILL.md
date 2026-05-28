@@ -92,12 +92,15 @@ don't fork a local copy. Silent drift here is the failure mode this skill exists
 
 ### Step 1 — Isolate the work in a branch + worktree
 
-Work in a dedicated branch in a separate worktree so the main workspace is never disturbed
-and the work is discardable.
+Autonomous build work is **always** isolated in its own worktree on its own branch — the
+primary worktree (where the human works on main, live) is never touched and never
+branch-switched. Create the worktree with `git worktree add`; **never `git checkout`/`switch`
+the primary worktree.**
 
 - Branch: `feat/<feature-id>-<short-slug>`, off the repo's main/default branch.
-- Worktree: **inside the project repo root** (never your agent/home config dir) — use the
-  project's convention, else `<project_root>/.worktrees/<slug>`; ensure it's gitignored.
+- Worktree: under **`.claude/worktrees/<slug>/`** in the project repo (never your agent/home
+  config dir). Ensure `.claude/worktrees/` is gitignored (add it to `.git/info/exclude` if the
+  tracked `.gitignore` shouldn't be touched) so transient build trees aren't committed.
 - If the repo isn't a git repo or has no commits, surface that and ask — isolation
   assumptions don't hold otherwise.
 

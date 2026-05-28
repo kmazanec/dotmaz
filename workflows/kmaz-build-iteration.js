@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Build an approved iteration in parallel: implement + commit the frozen shared contracts (barrier), then fan out one worktree-isolated workstream per feature — build test-first to the spec checklist, drive the running app for QA evidence, run a full adversarial review panel (spec/security/robustness/efficiency/convention + contrarian) that loops until clean, gate on spec+security findings — and return a convergence report for the human to land as one MR.',
   whenToUse:
-    'Run AFTER kmaz-plan-iteration and AFTER a human approves the iteration\'s BUILD-PLAN manifest + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees .worktrees/<slug>/, report CONVERGENCE-<slug>.md), so multiple iterations can build CONCURRENTLY without colliding. Stops at per-feature pushed branches + a convergence report — the human converges them into one linear MR.',
+    'Run AFTER kmaz-plan-iteration and AFTER a human approves the iteration\'s BUILD-PLAN manifest + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/, report CONVERGENCE-<slug>.md), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — the primary worktree (where the human works on main) is never touched. Stops at per-feature pushed branches + a convergence report — the human converges them into one linear MR.',
   phases: [
     { title: 'Load', detail: 'read the approved manifest + per-feature plans; sanity-check it is approved' },
     { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any fan-out', model: 'opus' },
@@ -24,14 +24,17 @@ export const meta = {
 // MR open are deliberately kept OUT of the workflow because they are the
 // judgment-heavy, hard-to-reverse, outward-facing steps.
 //
-// Isolation model (approved): ONE git worktree per FEATURE. Sub-task agents
-// within a feature share that feature's worktree; features never clobber each
-// other because each owns its own tree + branch. The contract barrier runs
-// first on a shared build branch that every feature worktree forks from.
+// Isolation model: ALL build work is autonomous, so it ALWAYS runs in its own
+// worktree under .claude/worktrees/ on its own branch — the primary worktree
+// (where the human works on main, live) is NEVER touched, never branch-switched.
+// ONE git worktree per FEATURE; sub-task agents within a feature share that
+// feature's worktree; features never clobber each other because each owns its
+// own tree + branch. The contract barrier runs first on a shared build branch
+// (in its own worktree) that every feature worktree forks from.
 //
 // PARALLEL ITERATIONS: every artifact is name-scoped to the iteration slug
 // (from the manifest) — build branch build/<slug>, worktrees under
-// .worktrees/<slug>/, integration branch integration/<slug>, report
+// .claude/worktrees/<slug>/, integration branch integration/<slug>, report
 // docs/CONVERGENCE-<slug>.md. So two iterations can build CONCURRENTLY without
 // colliding on a branch, a worktree path, or the report file. (Per-feature
 // branches feat/<id> are already globally unique by feature id.) This is the
@@ -220,7 +223,10 @@ const ITERATION_SLUG = (manifest.iterationSlug || manifest.iterationName || 'ite
   .replace(/[^a-z0-9]+/g, '-')
   .replace(/^-+|-+$/g, '')
 const buildBranch = BUILD_BRANCH ?? manifest.buildBranch ?? `build/${ITERATION_SLUG}`
-const WORKTREE_DIR = `.worktrees/${ITERATION_SLUG}` // every worktree for this iteration nests here
+// Autonomous build work is ALWAYS isolated in .claude/worktrees/ on its own
+// branch — never the primary worktree (the human works on main there, live).
+// Every worktree for this iteration nests under one slug-scoped dir.
+const WORKTREE_DIR = `.claude/worktrees/${ITERATION_SLUG}`
 const testCommand = manifest.testCommand
 log(`Approved: ${manifest.iterationName} (slug "${ITERATION_SLUG}"). ${manifest.features.length} feature(s) onto ${buildBranch}. Test cmd: ${testCommand}`)
 
@@ -234,7 +240,9 @@ log(`Approved: ${manifest.iterationName} (slug "${ITERATION_SLUG}"). ${manifest.
 phase('Contract barrier')
 
 const barrier = await agent(
-  `You are landing the frozen shared contracts for a parallel build, BEFORE any feature work. Create the build branch \`${buildBranch}\` off the repo's main/default branch, in its own worktree at \`${WORKTREE_DIR}/contracts\` (this iteration's worktrees all nest under \`${WORKTREE_DIR}/\` so concurrent iterations never collide). Implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), run the suite (\`${testCommand}\`) until green, and commit.
+  `You are landing the frozen shared contracts for a parallel build, BEFORE any feature work. Create the build branch \`${buildBranch}\` in its OWN NEW WORKTREE: \`git worktree add ${WORKTREE_DIR}/contracts -b ${buildBranch} <main/default>\`, working ENTIRELY inside \`${WORKTREE_DIR}/contracts\`. NEVER \`git checkout\`/\`switch\` the primary worktree — the human is working there on main, live; changing its branch yanks files out from under them. (This iteration's worktrees all nest under \`${WORKTREE_DIR}/\` so concurrent iterations never collide.) Implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), run the suite (\`${testCommand}\`) until green, and commit.
+
+Before creating the worktree, ensure \`.claude/worktrees/\` is gitignored (it holds transient build trees that must never be committed): if it isn't already ignored, add it to \`.git/info/exclude\` (don't modify a tracked .gitignore unless the project clearly wants it there).
 
 You MUST NOT implement feature behavior — only the contract shapes + their exhaustive consumers. You MUST NOT reference any feature ID (F-NN) in code/config/comments — those are transient; reference a durable ADR or let it stand alone.
 
@@ -270,7 +278,7 @@ function tierModel(t) {
 async function buildFeature(f) {
   const model = tierModel(f.tier)
   return agent(
-    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end in its OWN git worktree at \`${WORKTREE_DIR}/${f.id.toLowerCase()}\` on branch \`feat/${f.id.toLowerCase()}\`, forked from \`${buildBranch}\` @ ${barrier.commitSha} (which carries the frozen contracts). All of this iteration's worktrees nest under \`${WORKTREE_DIR}/\` so a concurrently-building iteration never collides with yours.
+    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end in its OWN NEW git worktree: \`git worktree add ${WORKTREE_DIR}/${f.id.toLowerCase()} -b feat/${f.id.toLowerCase()} ${buildBranch}\` (forked from \`${buildBranch}\` @ ${barrier.commitSha}, which carries the frozen contracts). Work ENTIRELY inside \`${WORKTREE_DIR}/${f.id.toLowerCase()}\`. NEVER \`git checkout\`/\`switch\` the primary worktree — the human works there on main, live. All of this iteration's worktrees nest under \`${WORKTREE_DIR}/\` so a concurrently-building iteration never collides with yours.
 
 ${frozenBrief}
 
@@ -421,7 +429,7 @@ const convergence = await agent(
   `You are the integrator running the convergence review for the assembled iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each feature built on its own branch off that.
 
 DO NOT open a PR/MR and DO NOT do the final merge — the human owns landing this as one linear MR. Your job is the convergence CHECK + report:
-1. Assemble the shippable feature branches onto an iteration-scoped throwaway integration branch \`integration/${ITERATION_SLUG}\` off \`${buildBranch}\`, in a worktree at \`${WORKTREE_DIR}/integration\` (scoped so a concurrent iteration's integration never collides with this one). Rebase/cherry-pick in DAG order; resolve the predicted convergence in place. If a real conflict needs human judgment, STOP that feature and report it — don't force it.
+1. Assemble the shippable feature branches onto an iteration-scoped throwaway integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration's integration never collides with this one). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Rebase/cherry-pick the feature branches in DAG order; resolve the predicted convergence in place. If a real conflict needs human judgment, STOP that feature and report it — don't force it.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch.
 3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence.`}
 
