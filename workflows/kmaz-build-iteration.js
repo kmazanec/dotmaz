@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Build an approved iteration in parallel: implement + commit the frozen shared contracts (barrier), then fan out one worktree-isolated workstream per feature — build test-first to the spec checklist, drive the running app for QA evidence, run a full adversarial review panel (spec/security/robustness/efficiency/convention + contrarian) that loops until clean, gate on spec+security findings — and return a convergence report for the human to land as one MR.',
   whenToUse:
-    'Run AFTER kmaz-plan-iteration and AFTER a human approves the BUILD-PLAN.md manifest + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Stops at per-feature pushed branches + a convergence report — the human converges them into one linear MR.',
+    'Run AFTER kmaz-plan-iteration and AFTER a human approves the iteration\'s BUILD-PLAN manifest + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees .worktrees/<slug>/, report CONVERGENCE-<slug>.md), so multiple iterations can build CONCURRENTLY without colliding. Stops at per-feature pushed branches + a convergence report — the human converges them into one linear MR.',
   phases: [
     { title: 'Load', detail: 'read the approved manifest + per-feature plans; sanity-check it is approved' },
     { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any fan-out', model: 'opus' },
@@ -28,6 +28,15 @@ export const meta = {
 // within a feature share that feature's worktree; features never clobber each
 // other because each owns its own tree + branch. The contract barrier runs
 // first on a shared build branch that every feature worktree forks from.
+//
+// PARALLEL ITERATIONS: every artifact is name-scoped to the iteration slug
+// (from the manifest) — build branch build/<slug>, worktrees under
+// .worktrees/<slug>/, integration branch integration/<slug>, report
+// docs/CONVERGENCE-<slug>.md. So two iterations can build CONCURRENTLY without
+// colliding on a branch, a worktree path, or the report file. (Per-feature
+// branches feat/<id> are already globally unique by feature id.) This is the
+// whole point of iteration-level parallelism — never reintroduce an unscoped
+// shared name here.
 //
 // The manifest is the BUILD-PLAN.md kmaz-plan-iteration wrote INTO the iteration
 // directory (docs/iterations/NN-<slug>/BUILD-PLAN.md). It carries each feature's
@@ -54,12 +63,13 @@ const SKIP_APP_SMOKE = args?.skipAppSmoke === true
 
 const MANIFEST_SCHEMA = {
   type: 'object',
-  required: ['approved', 'iterationName', 'buildBranch', 'frozenContracts', 'features'],
+  required: ['approved', 'iterationName', 'iterationSlug', 'buildBranch', 'frozenContracts', 'features'],
   properties: {
     approved: { type: 'boolean', description: 'true only if the manifest shows it has been approved (Status not "Awaiting approval") AND has no unresolved blockers' },
     approvalEvidence: { type: 'string', description: 'the line/marker that shows approval, or why you judged it approved' },
     iterationName: { type: 'string' },
-    buildBranch: { type: 'string', description: 'the base branch contracts land on and features fork from, e.g. build/<iteration-slug>' },
+    iterationSlug: { type: 'string', description: 'the kebab slug that name-scopes EVERY build artifact (branch, worktrees, report) so this iteration can build concurrently with others. Read it from the manifest; if absent, derive a kebab slug from iterationName.' },
+    buildBranch: { type: 'string', description: 'the base branch contracts land on and features fork from — MUST be build/<iterationSlug> from the manifest' },
     blockers: { type: 'array', items: { type: 'string' } },
     frozenContracts: {
       type: 'array',
@@ -180,11 +190,12 @@ phase('Load')
 const manifest = await agent(
   `Read the approved build manifest at \`${MANIFEST_PATH}\` and the per-feature "Build plan (approved)" sections in each spec it references. This is read-only.
 
-If that exact path doesn't exist, the manifest may live elsewhere depending on the project's docs layout: the current layout writes it inside the iteration dir (\`docs/iterations/NN-<slug>/BUILD-PLAN.md\`); the LEGACY flat layout writes it at \`docs/BUILD-PLAN.md\`. Locate the iteration's BUILD-PLAN.md under \`docs/\` and use it. The feature specs may correspondingly be either nested under an iteration dir or flat in \`docs/features/\` — follow whatever specPaths the manifest names; the build is layout-agnostic.
+If that exact path doesn't exist, the manifest may live elsewhere depending on the project's docs layout: the current layout writes it inside the iteration dir (\`docs/iterations/NN-<slug>/BUILD-PLAN.md\`); the LEGACY flat layout writes it slug-scoped at \`docs/BUILD-PLAN-<iteration-slug>.md\`. Locate THIS iteration's BUILD-PLAN under \`docs/\` and use it (if several exist, they are different iterations — pick the one the caller meant). The feature specs may correspondingly be either nested under an iteration dir or flat in \`docs/features/\` — follow whatever specPaths the manifest names; the build is layout-agnostic.
 
 Determine:
 - Whether the plan is APPROVED. It is approved only if its Status is NOT "Awaiting approval" (a human flips it, e.g. to "Approved") AND its Blockers list is empty/"None". If it still says awaiting-approval or has blockers, set approved=false and explain — the build must NOT proceed on an unapproved plan.
-- The build branch name (use the manifest's if present, else propose \`build/<iteration-slug>\`).${BUILD_BRANCH ? ` The caller specified buildBranch="${BUILD_BRANCH}" — use it.` : ''}
+- The iteration slug (read \`iterationSlug\` from the manifest; if an old manifest lacks it, derive a kebab slug from the iteration name). EVERY build artifact is scoped to this so concurrent iterations don't collide — return it.
+- The build branch name: use the manifest's \`buildBranch\` (it is \`build/<iterationSlug>\`).${BUILD_BRANCH ? ` The caller specified buildBranch="${BUILD_BRANCH}" — use it.` : ''}
 - The frozen contracts (name, source of truth, signature, per-feature extensions, exhaustive consumers).
 - The features (id, spec path, title, whole-feature tier, hard-dep "after" list).
 - The repo's ACTUAL test command (discover it — do not assume a stack) and how a user runs the app (for QA).
@@ -198,9 +209,20 @@ if (!manifest.approved) {
   return { stopped: true, reason: 'manifest-not-approved', evidence: manifest.approvalEvidence, blockers: manifest.blockers ?? [] }
 }
 
-const buildBranch = BUILD_BRANCH ?? manifest.buildBranch
+// PARALLEL ITERATIONS: scope EVERY artifact to the iteration slug so two
+// iterations can build concurrently without colliding on a branch, a worktree
+// path, or the report file. The slug comes from the manifest (the plan workflow
+// wrote it); fall back to a kebab of the iteration name if an old manifest
+// lacks it. buildBranch is build/<slug>; worktrees live under a slug-scoped
+// dir; feature branches are namespaced by slug; the report filename carries it.
+const ITERATION_SLUG = (manifest.iterationSlug || manifest.iterationName || 'iteration')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+const buildBranch = BUILD_BRANCH ?? manifest.buildBranch ?? `build/${ITERATION_SLUG}`
+const WORKTREE_DIR = `.worktrees/${ITERATION_SLUG}` // every worktree for this iteration nests here
 const testCommand = manifest.testCommand
-log(`Approved: ${manifest.iterationName}. ${manifest.features.length} feature(s) onto ${buildBranch}. Test cmd: ${testCommand}`)
+log(`Approved: ${manifest.iterationName} (slug "${ITERATION_SLUG}"). ${manifest.features.length} feature(s) onto ${buildBranch}. Test cmd: ${testCommand}`)
 
 // === Phase 2: Contract barrier =============================================
 // HARD BARRIER. One Opus agent implements + commits the frozen contracts to the
@@ -212,7 +234,7 @@ log(`Approved: ${manifest.iterationName}. ${manifest.features.length} feature(s)
 phase('Contract barrier')
 
 const barrier = await agent(
-  `You are landing the frozen shared contracts for a parallel build, BEFORE any feature work. Create the build branch \`${buildBranch}\` off the repo's main/default branch (in its own worktree under the project's worktree convention or \`<repo_root>/.worktrees/\`), implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), run the suite (\`${testCommand}\`) until green, and commit.
+  `You are landing the frozen shared contracts for a parallel build, BEFORE any feature work. Create the build branch \`${buildBranch}\` off the repo's main/default branch, in its own worktree at \`${WORKTREE_DIR}/contracts\` (this iteration's worktrees all nest under \`${WORKTREE_DIR}/\` so concurrent iterations never collide). Implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), run the suite (\`${testCommand}\`) until green, and commit.
 
 You MUST NOT implement feature behavior — only the contract shapes + their exhaustive consumers. You MUST NOT reference any feature ID (F-NN) in code/config/comments — those are transient; reference a durable ADR or let it stand alone.
 
@@ -248,7 +270,7 @@ function tierModel(t) {
 async function buildFeature(f) {
   const model = tierModel(f.tier)
   return agent(
-    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end in its OWN git worktree + branch \`feat/${f.id.toLowerCase()}\`, forked from \`${buildBranch}\` @ ${barrier.commitSha} (which carries the frozen contracts). Worktree under the project's convention or \`<repo_root>/.worktrees/\`.
+    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end in its OWN git worktree at \`${WORKTREE_DIR}/${f.id.toLowerCase()}\` on branch \`feat/${f.id.toLowerCase()}\`, forked from \`${buildBranch}\` @ ${barrier.commitSha} (which carries the frozen contracts). All of this iteration's worktrees nest under \`${WORKTREE_DIR}/\` so a concurrently-building iteration never collides with yours.
 
 ${frozenBrief}
 
@@ -399,11 +421,11 @@ const convergence = await agent(
   `You are the integrator running the convergence review for the assembled iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each feature built on its own branch off that.
 
 DO NOT open a PR/MR and DO NOT do the final merge — the human owns landing this as one linear MR. Your job is the convergence CHECK + report:
-1. Assemble the shippable feature branches onto a throwaway integration branch off \`${buildBranch}\` (rebase/cherry-pick in DAG order; resolve the predicted convergence in place). If a real conflict needs human judgment, STOP that feature and report it — don't force it.
+1. Assemble the shippable feature branches onto an iteration-scoped throwaway integration branch \`integration/${ITERATION_SLUG}\` off \`${buildBranch}\`, in a worktree at \`${WORKTREE_DIR}/integration\` (scoped so a concurrent iteration's integration never collides with this one). Rebase/cherry-pick in DAG order; resolve the predicted convergence in place. If a real conflict needs human judgment, STOP that feature and report it — don't force it.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch.
 3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence.`}
 
-Then write a CONVERGENCE REPORT (as a Markdown file \`docs/CONVERGENCE-${manifest.iterationName.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}.md\` AND as your returned text) covering, per feature: branch name, shippable y/n, acceptance status, unresolved gating findings, deferred low findings, QA evidence, and the retro propagation made. Plus batch-level: the integrated suite result (quoted), the smoke evidence, the convergence conflicts hit + how resolved, and an ORDERED cherry-pick/rebase recipe the human can follow to build the single linear MR. End with explicit next steps for the human.
+Then write a CONVERGENCE REPORT (as a Markdown file \`docs/CONVERGENCE-${ITERATION_SLUG}.md\` AND as your returned text) covering, per feature: branch name, shippable y/n, acceptance status, unresolved gating findings, deferred low findings, QA evidence, and the retro propagation made. Plus batch-level: the integrated suite result (quoted), the smoke evidence, the convergence conflicts hit + how resolved, and an ORDERED cherry-pick/rebase recipe the human can follow to build the single linear MR. End with explicit next steps for the human.
 
 Shippable features: ${JSON.stringify(shippable, null, 2)}
 Blocked features (needs human): ${JSON.stringify(blocked, null, 2)}`,
@@ -414,7 +436,9 @@ log(`Build complete. ${shippable.length} shippable, ${blocked.length} blocked. C
 
 return {
   iteration: manifest.iterationName,
+  iterationSlug: ITERATION_SLUG,
   buildBranch,
+  worktreeDir: WORKTREE_DIR,
   contractCommit: barrier.commitSha,
   shippable: shippable.map((r) => ({ id: r.featureId, branch: r.branch })),
   blocked: blocked.map((r) => ({ id: r.featureId, branch: r.branch, unresolvedGating: r.unresolvedGating })),

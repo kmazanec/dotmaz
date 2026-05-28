@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Plan a parallel build of an iteration: read roadmap + feature specs, draft each feature from independent angles (architect/researcher/contrarian), synthesize a build plan per feature, and emit per-spec checkbox plans + a BUILD-PLAN.md manifest (DAG, model tiers, frozen contract signatures) for human approval before any code is built.',
   whenToUse:
-    'Run BEFORE building several independent features from one roadmap iteration in parallel. Produces the reviewable plan that kmaz-build-iteration consumes. You approve the plan in conversation, then launch the build workflow.',
+    'Run BEFORE building several independent features from one roadmap iteration in parallel. Produces the reviewable plan that kmaz-build-iteration consumes. The manifest is name-scoped to the iteration (and records an iteration slug the build uses to scope its branch/worktrees/report), so multiple iterations can be planned and built concurrently without colliding. You approve the plan in conversation, then launch the build workflow.',
   phases: [
     { title: 'Scope', detail: 'read the iteration dir (overview + nested feature specs) + roadmap; verify dependencies exist in code' },
     { title: 'Plan', detail: 'per feature: architect + researcher + contrarian draft, judged into one build plan' },
@@ -45,23 +45,49 @@ export const meta = {
 // dir); the manifest then defaults next to ROADMAP.md instead of an iteration
 // dir that doesn't exist.
 //
+// PARALLEL ITERATIONS: every artifact this workflow emits is name-scoped to the
+// iteration so two iterations can be planned (and later built) concurrently
+// WITHOUT colliding. In the current layout the per-iteration directory already
+// scopes the manifest; in the legacy flat layout the manifest filename carries
+// the iteration slug (docs/BUILD-PLAN-<slug>.md, not a single shared
+// docs/BUILD-PLAN.md). The slug is also written into the manifest so the build
+// workflow can scope ITS artifacts (build branch, worktrees, report) to the
+// same iteration. An unscoped name here is the bottleneck that serializes
+// iterations — don't reintroduce one.
+//
 // `args` (all optional):
 //   { iterationDir?: string,   // current layout: the iteration dir to plan (default: docs/iterations/01-*)
 //     featuresDir?: string,    // legacy layout: flat specs dir (e.g. docs/features); set this for legacy projects
+//     iterationSlug?: string,  // explicit slug to name-scope artifacts; else derived from iteration/iterationDir
 //     roadmap?: string,        // path to ROADMAP.md (default: docs/ROADMAP.md) for cross-iteration context
 //     iteration?: string,      // iteration name/number to plan — REQUIRED for legacy flat layout to scope the batch
 //     features?: string[],     // explicit spec paths/ids to plan (overrides the dir's feature set)
-//     manifestPath?: string }  // where to write the manifest (default: <iterationDir>/BUILD-PLAN.md, or docs/BUILD-PLAN.md in legacy mode)
+//     manifestPath?: string }  // override manifest path (default: <iterationDir>/BUILD-PLAN.md, or docs/BUILD-PLAN-<slug>.md legacy)
 // ---------------------------------------------------------------------------
 
 const FEATURES_DIR = args?.featuresDir ?? null // legacy flat layout when set
 const LEGACY = FEATURES_DIR !== null
 const ITERATION_DIR = args?.iterationDir ?? 'docs/iterations/01-*'
 const ROADMAP = args?.roadmap ?? 'docs/ROADMAP.md'
-const MANIFEST_PATH =
-  args?.manifestPath ?? (LEGACY ? 'docs/BUILD-PLAN.md' : `${ITERATION_DIR.replace(/\/$/, '')}/BUILD-PLAN.md`)
 const ITERATION = args?.iteration ?? null
 const EXPLICIT_FEATURES = Array.isArray(args?.features) ? args.features : null
+
+// Slug that name-scopes every artifact. Prefer an explicit slug; else derive
+// from the iteration name, else from the iteration-dir basename. Falls back to
+// 'iteration' only when nothing is known (single-iteration use is then still
+// correct; concurrent use should pass iteration/iterationSlug).
+function slugify(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+const ITERATION_SLUG =
+  (args?.iterationSlug && slugify(args.iterationSlug)) ||
+  (ITERATION && slugify(ITERATION)) ||
+  (!ITERATION_DIR.includes('*') && slugify(ITERATION_DIR.replace(/\/$/, '').split('/').pop())) ||
+  'iteration'
+
+const MANIFEST_PATH =
+  args?.manifestPath ??
+  (LEGACY ? `docs/BUILD-PLAN-${ITERATION_SLUG}.md` : `${ITERATION_DIR.replace(/\/$/, '')}/BUILD-PLAN.md`)
 
 // === Schemas ===============================================================
 
@@ -345,11 +371,11 @@ Use this structure (Markdown with a fenced \`\`\`json block holding the structur
 
 # Build plan — ${scope.iterationName}
 
-**Status:** Awaiting approval · **Iteration goal:** ${scope.iterationGoal ?? ''}
+**Status:** Awaiting approval · **Iteration goal:** ${scope.iterationGoal ?? ''} · **Iteration slug:** \`${ITERATION_SLUG}\`
 
 ## How to use this
 1. A human reviews this manifest + the per-feature "Build plan (approved)" sections in each spec.
-2. On approval, run the build workflow which: implements + commits the frozen contracts (barrier), then fans out one worktree-isolated workstream per feature per the DAG, builds test-first, drives the running app for QA, runs the adversarial review panel, and returns a convergence report.
+2. On approval, run the build workflow which: implements + commits the frozen contracts (barrier), then fans out one worktree-isolated workstream per feature per the DAG, builds test-first, drives the running app for QA, runs the adversarial review panel, and returns a convergence report. The build scopes its branch, worktrees, and report to the iteration slug above, so this iteration can build concurrently with others.
 
 ## Blockers
 ${(scope.blockers && scope.blockers.length) ? scope.blockers.map((b) => `- ${b}`).join('\n') : '- None.'}
@@ -369,7 +395,7 @@ A table mapping each feature id -> spec path -> whole-feature model tier -> whic
 ## Per-feature plans
 A table linking each feature id to its spec file's "Build plan (approved)" section.
 
-Then embed the full machine-readable manifest as a fenced json block with keys: { iterationName, iterationGoal, blockers, frozenContracts, buildDAG, criticalPath, convergenceRisks, features: [{id, specPath, title, tier}] }.
+Then embed the full machine-readable manifest as a fenced json block with keys: { iterationName, iterationSlug: "${ITERATION_SLUG}", buildBranch: "build/${ITERATION_SLUG}", iterationGoal, blockers, frozenContracts, buildDAG, criticalPath, convergenceRisks, features: [{id, specPath, title, tier}] }. The iterationSlug and buildBranch MUST be exactly as given here — the build workflow scopes every artifact to them so iterations don't collide.
 
 Source data:
 SCOPE: ${JSON.stringify(scope, null, 2)}
@@ -383,7 +409,9 @@ log(`Plan complete. Review ${MANIFEST_PATH} + each spec's "Build plan (approved)
 
 return {
   iteration: scope.iterationName,
+  iterationSlug: ITERATION_SLUG,
   manifestPath: MANIFEST_PATH,
+  buildBranch: `build/${ITERATION_SLUG}`,
   blockers: scope.blockers ?? [],
   featureCount: goodPlans.length,
   features: goodPlans.map((p) => p.featureId),
@@ -391,5 +419,5 @@ return {
   frozenContractCount: (contractSpec.frozenContracts ?? []).length,
   nextStep: (scope.blockers && scope.blockers.length)
     ? 'Resolve blockers with the human BEFORE building.'
-    : `Human approves the plan, then run kmaz-build-iteration with args { manifestPath: "${MANIFEST_PATH}" }.`,
+    : `Human approves the plan, then run kmaz-build-iteration with args { manifestPath: "${MANIFEST_PATH}" }. Artifacts are scoped to slug "${ITERATION_SLUG}", so this can build concurrently with other iterations.`,
 }
