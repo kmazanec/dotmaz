@@ -1,12 +1,12 @@
 export const meta = {
   name: 'kmaz-plan-iteration',
   description:
-    'Plan a parallel build of an iteration: read roadmap + feature specs, draft each feature from independent angles (architect/researcher/contrarian), synthesize a build plan per feature, and emit per-spec checkbox plans + a BUILD-PLAN.md manifest (DAG, model tiers, frozen contract signatures) for human approval before any code is built.',
+    'Plan a parallel build of an iteration: read roadmap + feature specs, draft a build plan per feature (one opus pass reasoning through architect/reuse/contrarian lenses; high-uncertainty features escalate to a 3-draft panel), reconcile shared contracts, and emit per-spec checkbox plans + a BUILD-PLAN.md manifest (DAG, model tiers, frozen contract signatures) for human approval before any code is built.',
   whenToUse:
     'Run BEFORE building several independent features from one roadmap iteration in parallel. Produces the reviewable plan that kmaz-build-iteration consumes. The manifest is name-scoped to the iteration (and records an iteration slug the build uses to scope its branch/worktrees/report), so multiple iterations can be planned and built concurrently without colliding. You approve the plan in conversation, then launch the build workflow.',
   phases: [
     { title: 'Scope', detail: 'read the iteration dir (overview + nested feature specs) + roadmap; verify dependencies exist in code' },
-    { title: 'Plan', detail: 'per feature: architect + researcher + contrarian draft, judged into one build plan' },
+    { title: 'Plan', detail: 'per feature: ONE opus pass through architect/reuse/contrarian lenses → build plan; high-uncertainty features escalate to a 3-draft panel', model: 'opus' },
     { title: 'Contracts', detail: 'reconcile the per-feature plans into one frozen shared-contract spec + build DAG' },
     { title: 'Persist', detail: 'write per-feature checkbox plans into specs + BUILD-PLAN.md manifest' },
   ],
@@ -62,6 +62,7 @@ export const meta = {
 //     roadmap?: string,        // path to ROADMAP.md (default: docs/ROADMAP.md) for cross-iteration context
 //     iteration?: string,      // iteration name/number to plan — REQUIRED for legacy flat layout to scope the batch
 //     features?: string[],     // explicit spec paths/ids to plan (overrides the dir's feature set)
+//     multiDraft?: boolean,    // force the 3-draft+synth panel for EVERY feature (default: single-pass planner, panel only for highUncertainty features)
 //     manifestPath?: string }  // override manifest path (default: <iterationDir>/BUILD-PLAN.md, or docs/BUILD-PLAN-<slug>.md legacy)
 // ---------------------------------------------------------------------------
 
@@ -112,6 +113,7 @@ const SCOPE_SCHEMA = {
           parallelWith: { type: 'array', items: { type: 'string' } },
           touchesContracts: { type: 'array', items: { type: 'string' }, description: 'names of shared contracts this feature introduces, consumes, or extends' },
           dependenciesVerifiedInCode: { type: 'boolean', description: 'true only if the stated dependencies actually exist in the code, not just the plan' },
+          highUncertainty: { type: 'boolean', description: 'true ONLY for a feature whose approach is genuinely unsettled and worth THREE independent planning drafts instead of one: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open. A routine feature that extends an established pattern is NOT high-uncertainty — default false. Keep this rare; most features get the single-pass planner.' },
         },
       },
     },
@@ -240,6 +242,7 @@ Then, for EACH feature you'll plan:
 - Read its spec in full: description, dependencies, acceptance criteria, testing requirements, manual setup.
 - VERIFY its stated dependencies actually exist in the code (inspect the real code of dependency features, not just the plan). Set dependenciesVerifiedInCode accordingly. Trust the code over the plan where they diverge.
 - Identify which shared contracts it introduces/consumes/extends.
+- Set \`highUncertainty\` deliberately. Default FALSE — a routine feature that extends an established pattern gets a single planning pass. Set TRUE only when the APPROACH is genuinely unsettled and worth three independent planning drafts: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open. Keep it rare; flagging everything high-uncertainty defeats the point.
 
 CRITICAL: drop any feature that has a HARD dependency on another feature in the set (one that consumes another's not-yet-shipped behavior) — those build in a later serial batch, not this parallel fan-out. Contract-mediated soft deps are fine (they build against a frozen shape).
 
@@ -259,58 +262,73 @@ if (!featuresToplan.length) {
   return { scope, featurePlans: [], contractSpec: null, blocked: true }
 }
 
-log(`Planning ${featuresToplan.length} feature(s): ${featuresToplan.map((f) => f.id).join(', ')}`)
-
-// === Phase 2: Plan (judge-panel per feature) ===============================
-// Each feature is drafted from three independent angles, then synthesized.
-// Pipeline so a feature whose panel finishes early moves to synthesis while
-// another feature is still being drafted — no barrier between draft and judge.
+// === Phase 2: Plan (one planner per feature) ===============================
+// DEFAULT: one opus agent per feature reads the spec/ADRs/dep-code ONCE and
+// reasons through all three lenses (architect / reuse / contrarian) in a single
+// pass — replacing the old 3-independent-drafts + synth fan-out (4 opus
+// agents/feature) that the synth step collapsed into one plan anyway. A feature
+// the scope step flagged highUncertainty (or a run forced with args.multiDraft)
+// still gets the 3-draft panel, where independent drafts earn their cost.
+// Features plan concurrently (parallel) — they're independent until the
+// contract barrier below.
 
 phase('Plan')
 
+// DEFAULT planner: ONE opus agent per feature reads the spec/ADRs/dep-code ONCE
+// and reasons through all three lenses (architect structure / researcher reuse /
+// contrarian traps) in a single pass, emitting the build plan directly. This
+// replaces the old 3-independent-drafts + synth fan-out (4 opus agents/feature)
+// — the synth step was already collapsing the drafts into one plan, so for a
+// routine feature one strong pass holding all three lenses is the right trade.
+// The three lenses survive as a CHECKLIST inside the prompt, not 3 agents.
+const SINGLE_PASS_PLAN = (f) =>
+  `Draft the build plan for feature ${f.id} ("${f.title}") in ONE pass. Read its spec at \`${f.specPath}\`, the architecture/ADRs it cites, and the actual code of its dependencies — once. Reason through THREE lenses and fold them into a single plan:
+• ARCHITECT: ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria; honor every locked ADR + existing code pattern; smallest change that satisfies each criterion; name which chunks touch shared contracts and the exact additive signature each needs frozen.
+• RESEARCHER (reuse): what library/pattern does the existing code already use for this kind of work? footguns / version / platform limits the spec misses? a simpler path using something already in the tree? Maximize reuse; flag technology risk.
+• CONTRARIAN (traps): where are acceptance criteria ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? where might parallel features collide? Route the plan AROUND these and carry the survivors into \`risks\`.
+Tag each chunk's model tier (Sonnet = isolated+well-specified+mechanical; Opus tier REQUIRES a contract/novel/integration reason — no reason means default Sonnet). Pin the exact frozen signature for every contract touchpoint. Return the structured plan.`
+
+// ESCAPE HATCH: a feature the scope step flagged highUncertainty (load-bearing
+// new contract / novel-subtle algorithm / open approach) — OR a run forced via
+// args.multiDraft — still gets THREE independent drafts + a synth, because for a
+// genuinely unsettled approach the diversity of independent drafts is worth the
+// extra agents. Most features take the single-pass path above.
+const FORCE_MULTIDRAFT = args?.multiDraft === true
 const LENSES = [
-  {
-    key: 'architect',
-    prompt: (f) =>
-      `You are a senior software ARCHITECT drafting an implementation approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\`, the architecture/ADRs it cites, and the actual code of its dependencies. Propose the build as ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria. Honor every locked ADR decision and the existing code patterns. Favor the smallest change that satisfies each criterion. Name which chunks touch shared contracts and the exact additive signature each needs frozen. Tag each chunk's model tier (Sonnet = isolated+well-specified+mechanical; Opus = contract-touching/novel/integration, and you MUST state why for Opus). Return your draft plan.`,
-  },
-  {
-    key: 'researcher',
-    prompt: (f) =>
-      `You are a RESEARCHER pressure-testing the approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and the cited architecture. Investigate: what library/pattern does the existing code already use for this kind of work (search the repo)? Are there footguns, version constraints, or platform limits the spec doesn't mention? Is there a simpler path using something already in the tree? Return a plan that maximizes reuse of existing patterns and flags any technology risk, with the same chunk/tier/contract structure.`,
-  },
-  {
-    key: 'contrarian',
-    prompt: (f) =>
-      `You are a CONTRARIAN / skeptical senior engineer reviewing feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and dependencies. Your job is to find what's WRONG with the obvious approach: where will the acceptance criteria be ambiguous or untestable? Where does the spec assume a contract that doesn't exist? What's the riskiest chunk and why? What scope creep is hiding here? Where might parallel features collide? Return a plan that routes around the traps you found, plus an explicit \`risks\` list of what a builder must not get wrong.`,
-  },
+  { key: 'architect', prompt: (f) => `You are a senior software ARCHITECT drafting an implementation approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\`, the architecture/ADRs it cites, and the actual code of its dependencies. Propose the build as ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria. Honor every locked ADR decision and the existing code patterns. Favor the smallest change that satisfies each criterion. Name which chunks touch shared contracts and the exact additive signature each needs frozen. Tag each chunk's model tier (Sonnet = isolated+well-specified+mechanical; Opus = contract-touching/novel/integration, you MUST state why for Opus). Return your draft plan.` },
+  { key: 'researcher', prompt: (f) => `You are a RESEARCHER pressure-testing the approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and the cited architecture. Investigate: what library/pattern does the existing code already use (search the repo)? footguns, version constraints, platform limits the spec misses? a simpler path using something already in the tree? Return a plan that maximizes reuse and flags technology risk, with the same chunk/tier/contract structure.` },
+  { key: 'contrarian', prompt: (f) => `You are a CONTRARIAN / skeptical senior engineer reviewing feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and dependencies. Find what's WRONG with the obvious approach: where will acceptance criteria be ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? where might parallel features collide? Return a plan that routes around the traps, plus an explicit \`risks\` list of what a builder must not get wrong.` },
 ]
 
-const featurePlans = await pipeline(
-  featuresToplan,
-  // Stage 1: three independent drafts (a mini-barrier inside the stage, scoped per feature).
-  (f) =>
-    parallel(
-      LENSES.map((lens) => () =>
-        agent(lens.prompt(f), { label: `draft:${f.id}:${lens.key}`, phase: 'Plan', model: 'opus' }),
-      ),
-    ).then((drafts) => ({ feature: f, drafts: drafts.filter(Boolean) })),
-  // Stage 2: synthesize the three drafts into one build plan for the spec file.
-  ({ feature, drafts }) =>
-    agent(
-      `You are the lead engineer synthesizing ONE build plan for feature ${feature.id} ("${feature.title}") from three independent drafts (architect, researcher, contrarian). Spec: \`${feature.specPath}\`.
+async function planFeature(f) {
+  const multi = FORCE_MULTIDRAFT || f.highUncertainty === true
+  if (!multi) {
+    // Single-pass planner (the common path).
+    return agent(SINGLE_PASS_PLAN(f), { label: `plan:${f.id}`, phase: 'Plan', schema: FEATURE_PLAN_SCHEMA, model: 'opus' })
+  }
+  // High-uncertainty: three independent drafts → synth.
+  const drafts = (
+    await parallel(LENSES.map((lens) => () => agent(lens.prompt(f), { label: `draft:${f.id}:${lens.key}`, phase: 'Plan', model: 'opus' })))
+  ).filter(Boolean)
+  return agent(
+    `You are the lead engineer synthesizing ONE build plan for feature ${f.id} ("${f.title}") from three independent drafts (architect, researcher, contrarian). Spec: \`${f.specPath}\`.
 
 The three drafts:
 
 ${drafts.map((d, i) => `--- DRAFT ${i + 1} ---\n${d}`).join('\n\n')}
 
-Produce the single best plan: take the architect's structure, graft the researcher's reuse wins, and route around every trap the contrarian found (carry the survivors into \`risks\`). Every chunk must be a coherent test-first build-and-test slice ending in one tickable item, tagged with its model tier (Opus tier REQUIRES a contract/novel/integration reason — no reason means default it to Sonnet). Pin the exact frozen signature for every contract touchpoint. Return the structured plan.`,
-      { label: `synth:${feature.id}`, phase: 'Plan', schema: FEATURE_PLAN_SCHEMA, model: 'opus' },
-    ),
-)
+Produce the single best plan: take the architect's structure, graft the researcher's reuse wins, and route around every trap the contrarian found (carry the survivors into \`risks\`). Every chunk must be a coherent test-first build-and-test slice ending in one tickable item, tagged with its model tier (Opus tier REQUIRES a contract/novel/integration reason — no reason means default Sonnet). Pin the exact frozen signature for every contract touchpoint. Return the structured plan.`,
+    { label: `synth:${f.id}`, phase: 'Plan', schema: FEATURE_PLAN_SCHEMA, model: 'opus' },
+  )
+}
+
+const multiCount = featuresToplan.filter((f) => FORCE_MULTIDRAFT || f.highUncertainty === true).length
+log(`Planning ${featuresToplan.length} feature(s): ${featuresToplan.length - multiCount} single-pass, ${multiCount} multi-draft (high-uncertainty).`)
+
+const featurePlans = await parallel(featuresToplan.map((f) => () => planFeature(f)))
 
 const goodPlans = featurePlans.filter(Boolean)
-log(`Synthesized ${goodPlans.length}/${featuresToplan.length} feature plan(s).`)
+log(`Planned ${goodPlans.length}/${featuresToplan.length} feature(s).`)
 
 // === Phase 3: Contracts (reconcile across all features) ====================
 // BARRIER on purpose: locking shared contracts needs ALL feature plans at once,
