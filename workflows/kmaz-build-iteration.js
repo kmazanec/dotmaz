@@ -1,14 +1,14 @@
 export const meta = {
   name: 'kmaz-build-iteration',
   description:
-    'Build an approved iteration in parallel: implement + commit the frozen shared contracts (barrier), then fan out one worktree-isolated workstream per feature — build test-first to the spec checklist, drive the running app for QA evidence, run a full adversarial review panel (spec/security/robustness/efficiency/convention + contrarian) that loops until clean, gate on spec+security findings — and return a convergence report for the human to land as one MR.',
+    'Build an approved iteration in parallel: implement + commit the frozen shared contracts (barrier), then fan out one worktree-isolated workstream per feature — build test-first to the spec checklist, drive the running app for QA evidence, then ONE opus reviewer covers all six dimensions (spec/security/robustness/efficiency/convention/contrarian) and fixes its confirmed gating findings inline, with a conditional skeptic re-checking only high-severity security/spec — and return a convergence report for the human to land as one MR.',
   whenToUse:
     'Run AFTER kmaz-plan-iteration and AFTER a human approves the iteration\'s BUILD-PLAN manifest + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/, report CONVERGENCE-<slug>.md), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — the primary worktree (where the human works on main) is never touched. Stops at per-feature pushed branches + a convergence report — the human converges them into one linear MR.',
   phases: [
     { title: 'Load', detail: 'read the approved manifest + per-feature plans; sanity-check it is approved' },
     { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any fan-out', model: 'opus' },
     { title: 'Build', detail: 'per feature, in its own worktree: TDD each chunk to green, drive the running app for QA evidence' },
-    { title: 'Review', detail: 'per feature: adversarial panel (spec/security/robustness/efficiency/convention/contrarian), looped until clean, then gated triage-fix' },
+    { title: 'Review', detail: 'per feature: ONE opus reviewer covers all 6 dimensions + fixes gating findings inline; conditional skeptic on high-sev sec/spec', model: 'opus' },
     { title: 'Converge', detail: 'integrated suite + end-to-end smoke on the assembled batch; emit the convergence report' },
   ],
 }
@@ -139,6 +139,8 @@ const BUILD_SCHEMA = {
     deferredCheckboxes: { type: 'array', items: { type: 'string' }, description: 'checkboxes left unticked + why (needs human-only key/device)' },
     contractDrift: { type: 'string', description: 'any place the build needed a frozen contract to change — MUST be reported, never silently forked. "none" if clean.' },
     commits: { type: 'array', items: { type: 'string' } },
+    diffRange: { type: 'string', description: 'the exact git range that IS this feature\'s work, e.g. "<buildBranchSha>..HEAD" — so reviewers diff ONCE against the right base without re-deriving it' },
+    changedFiles: { type: 'array', items: { type: 'string' }, description: 'the files this feature changed (from git diff --name-only over diffRange) — lets reviewers scope their read without listing the tree themselves' },
   },
 }
 
@@ -157,18 +159,25 @@ const FINDING_PROPS = {
     fix: { type: 'string', description: 'the concrete fix' },
     gating: { type: 'boolean', description: 'true if a missed acceptance criterion, a high/medium security/contract issue, or a convention violation (F-NN leak / secret / inline ADR) — blocks shipping until fixed' },
     selfVerified: { type: 'boolean', description: 'true ONLY if you READ the cited code and confirmed this is real (not a guess). Omit findings you cannot self-verify rather than reporting them low-confidence.' },
+    fixedNow: { type: 'boolean', description: 'true if YOU fixed this gating finding inline in this same pass (localized edit, suite re-run green, committed). false for low/non-gating findings you only recorded, or for anything you ESCALATED instead of fixing.' },
+    escalated: { type: 'boolean', description: 'true if fixing this would need a frozen-contract change or a re-architecture (not a localized edit) — you STOPPED rather than fix it; it needs the human.' },
   },
 }
 
-// One reviewer covers MULTIPLE dimensions in a single read of the diff and
-// returns all findings tagged by dimension — replaces N separate per-dimension
-// reviewer agents.
+// ONE reviewer per feature covers ALL six dimensions in a single read of the
+// scoped diff, AND fixes its own confirmed gating findings inline (localized
+// edit + suite re-run + commit) in the same call — so there is no separate
+// mechanical reviewer and no separate fix agent. It returns each finding tagged
+// with whether it was fixedNow / escalated, plus a short fixSummary + the quoted
+// green suite result if it fixed anything.
 const GROUPED_REVIEW_SCHEMA = {
   type: 'object',
   required: ['findings'],
   properties: {
     dimensionsCovered: { type: 'array', items: { type: 'string' } },
     findings: { type: 'array', items: FINDING_PROPS },
+    fixSummary: { type: 'string', description: 'one-line summary of the gating fixes you applied inline this pass (empty if none)' },
+    suiteAfterFix: { type: 'string', description: 'quoted green suite result after your inline fixes (empty if you fixed nothing)' },
   },
 }
 
@@ -278,10 +287,14 @@ log(`Contracts landed @ ${barrier.commitSha}. ${barrier.frozenSignatures.length}
 const frozenBrief = `The shared contracts are FROZEN and committed on \`${buildBranch}\` @ ${barrier.commitSha}. Consume these signatures WITHOUT modifying them. If you believe you need to change one, STOP and report it as contractDrift — never fork a local copy:\n\n${barrier.frozenSignatures.map((s) => `- ${s}`).join('\n')}`
 
 // === Phases 3–4: per-feature pipeline (Build -> Review) ====================
-// Each feature runs its OWN worktree-isolated workstream through build then a
-// looped adversarial review. pipeline() so a feature that finishes building
-// moves into review while another is still building — no global barrier.
-// Hard-dep ordering ("after") is respected by gating each feature on its deps.
+// Each feature runs its OWN worktree-isolated workstream: build (1 agent) then
+// review (1 opus reviewer that also fixes gating findings inline; + a
+// conditional skeptic only when high-sev security/spec findings exist). So a
+// clean feature costs 2 agents (build + review), a feature with high-stakes
+// findings costs 3 — versus the old 4–6 (build + 2 reviewers + skeptic + fix).
+// pipeline() so a feature that finishes building moves into review while another
+// is still building — no global barrier. Hard-dep ordering ("after") is
+// respected by gating each feature on its deps.
 
 const byId = new Map()
 const featureResultPromises = new Map()
@@ -309,7 +322,7 @@ Record decisions + rationale into the spec's Implementation-notes as you go. NEV
 
 If you hit a contract gap — you think a frozen signature must change — STOP and report it in \`contractDrift\`; do not improvise a contract change. The full suite must end GREEN (no pending/failing).
 
-Return the structured build result with quoted test + QA evidence, your branch, your worktree path, and the commits.`,
+Return the structured build result with quoted test + QA evidence, your branch, your worktree path, the commits, and — so the reviewers diff ONCE against the right base instead of re-deriving it — set \`diffRange\` to \`${barrier.commitSha}..HEAD\` and \`changedFiles\` to the output of \`git diff --name-only ${barrier.commitSha}..HEAD\`.`,
     { label: `build:${f.id}`, phase: 'Build', schema: BUILD_SCHEMA, model, isolation: 'worktree' },
   )
 }
@@ -319,59 +332,16 @@ async function reviewFeature(build, f) {
   if (!build) return null
   const model = tierModel(f.tier)
 
-  // Consolidated panel: TWO reviewers per feature, each reading the diff ONCE
-  // and covering several dimensions, returning findings tagged by dimension.
-  // Each reviewer SELF-VERIFIES (reports only findings it confirmed against the
-  // cited code, omits the uncertain) — that is what lets us drop the old
-  // one-agent-per-finding refutation round. Risk-scaled: internal tooling
-  // (validation harness, dev scripts — no request surface, no trust boundary)
-  // gets only the reasoning reviewer's spec+convention pass; everything else
-  // gets the full two-reviewer panel. Caller can force full with args.fullPanel.
-  const isInternalTooling =
-    f.riskProfile === 'internal' ||
-    /valid|eval|harness|script|tooling/i.test(`${f.id} ${f.title ?? ''} ${f.specPath ?? ''}`)
-  const fullPanel = args?.fullPanel === true || !isInternalTooling
-
-  // The "reasoning" reviewer (opus): the dimensions where the Opus/Sonnet gap is
-  // widest — judging acceptance criteria, security reasoning, and adversarially
-  // trying to break the feature. The "mechanical" reviewer (sonnet): the
-  // checklist dimensions. For internal tooling we drop security+contrarian+
-  // efficiency and keep spec+convention+robustness on the cheaper reviewer.
-  const REVIEWERS = fullPanel
-    ? [
-        {
-          key: 'reasoning',
-          model: 'opus',
-          dims: 'spec-compliance, security, contrarian',
-          prompt:
-            'Cover THREE dimensions in one read of the diff:\n' +
-            '• spec-compliance: does it satisfy EVERY acceptance criterion in the spec and honor every cited ADR? Any missed/partial criterion is GATING. Flag contract drift as gating.\n' +
-            '• security: input validation, injection, secret handling, authn/authz, trust boundaries, SSRF, project safety invariants. high/medium are GATING.\n' +
-            '• contrarian: ignore the happy path — find the input/state/integration that BREAKS an invariant or defeats a criterion, or a test that passes for the wrong reason. Anything defeating a criterion is gating.',
-        },
-        {
-          key: 'mechanical',
-          model: 'sonnet',
-          dims: 'robustness, efficiency, convention',
-          prompt:
-            'Cover THREE dimensions in one read of the diff:\n' +
-            '• robustness: edge cases, failure modes, error handling, resource cleanup, concurrency, retries, timeouts. high/medium gating.\n' +
-            '• efficiency: needless work, hot-path allocations, N+1 queries, oversized payloads, wasted re-renders. Rarely gating unless it breaks a stated perf criterion.\n' +
-            '• convention: grep the diff for `F-[0-9]` and flag EVERY hit in code/config/env-templates/prompts/committed-docs (allowed only in the spec file / commit messages); flag inline architectural decisions that belong in an ADR; flag any secret/.env content in the diff. These convention hits are ALWAYS gating.',
-        },
-      ]
-    : [
-        {
-          key: 'reasoning',
-          model: 'sonnet',
-          dims: 'spec-compliance, robustness, convention',
-          prompt:
-            'Internal tooling — cover THREE dimensions in one read of the diff:\n' +
-            '• spec-compliance: every acceptance criterion met + cited ADRs honored? missed/partial = GATING.\n' +
-            '• robustness: failure modes, error handling, resource cleanup for the script/harness. high/medium gating.\n' +
-            '• convention: `F-[0-9]` leaks, inline ADR-worthy decisions, secrets in the diff — ALWAYS gating.',
-        },
-      ]
+  // ONE reviewer/fixer per feature. A single opus agent reads the scoped diff
+  // ONCE, covers ALL six dimensions, self-verifies each finding against the
+  // cited code, AND fixes its own confirmed gating findings inline (localized
+  // edit + suite re-run + commit) in the SAME call — then reports each finding
+  // tagged fixedNow / escalated. This replaces the old two-reviewers + separate
+  // fix agent (3–4 agents/feature) with 1 (+ a conditional skeptic). The diff
+  // range + changed files were computed ONCE by the build agent, so the reviewer
+  // doesn't re-derive them or re-ingest the whole spec.
+  const diffRange = build.diffRange || `${barrier.commitSha}..HEAD`
+  const changedFiles = (build.changedFiles ?? []).join(', ') || '(run `git diff --name-only ' + diffRange + '`)'
 
   let round = 0
   let cleanRounds = 0
@@ -381,38 +351,42 @@ async function reviewFeature(build, f) {
   while (round < MAX_REVIEW_ROUNDS && cleanRounds < 1) {
     round++
 
-    // Run the (1–2) consolidated reviewers concurrently against the branch.
-    const reviews = await parallel(
-      REVIEWERS.map((r) => () =>
-        agent(
-          `Adversarially review feature ${f.id} on branch \`${build.branch}\` (worktree \`${build.worktree}\`), round ${round}. Spec: \`${f.specPath}\`. ${round > 1 ? `A prior round already fixed: ${lastFixSummary}. Find what is STILL wrong or newly introduced.` : ''}\n\nRead the diff ONCE and review these dimensions: ${r.dims}.\n${r.prompt}\n\nFor EACH finding: read the cited code to CONFIRM it is real before reporting it; set selfVerified:true only when you did. If you cannot confirm a finding, OMIT it rather than reporting it speculatively. Tag each finding with its dimension, severity, file:line/quoted evidence, a concrete fix, and the gating flag.`,
-          { label: `review:${f.id}:${r.key}:r${round}`, phase: 'Review', schema: GROUPED_REVIEW_SCHEMA, model: r.model },
-        ),
-      ),
+    const review = await agent(
+      `Review AND fix feature ${f.id} in worktree \`${build.worktree}\` (branch \`${build.branch}\`), round ${round}. ${round > 1 ? `A prior round already fixed: ${lastFixSummary}. Find what is STILL wrong or newly introduced.` : ''}
+
+The feature's changes are EXACTLY \`git diff ${diffRange}\` (changed files: ${changedFiles}). Read that diff ONCE — do not re-derive the range or scan unrelated files. For acceptance criteria, read only the "Acceptance criteria" + "Build plan (approved)" sections of \`${f.specPath}\` (not the whole spec). ${frozenBrief}
+
+Cover ALL SIX dimensions in that one read:
+• spec-compliance: satisfies EVERY acceptance criterion + honors every cited ADR? missed/partial = GATING. Contract drift = gating.
+• security: input validation, injection, secret handling, authn/authz, trust boundaries, SSRF, project safety invariants. high/medium = GATING.
+• contrarian: ignore the happy path — the input/state/integration that BREAKS an invariant or defeats a criterion, or a test passing for the wrong reason. Defeating a criterion = gating.
+• robustness: edge cases, failure modes, error handling, resource cleanup, concurrency, retries, timeouts. high/medium gating.
+• efficiency: needless work, hot-path allocations, N+1 queries, oversized payloads, wasted re-renders. Rarely gating unless it breaks a stated perf criterion.
+• convention: grep the diff for \`F-[0-9]\` and flag EVERY hit in code/config/env-templates/prompts/committed-docs (allowed only in the spec file / commit messages); flag inline architectural decisions that belong in an ADR; flag any secret/.env content. These convention hits are ALWAYS gating.
+
+For EACH finding: read the cited code to CONFIRM it is real before reporting it; set selfVerified:true only when you did. OMIT anything you cannot confirm rather than reporting it speculatively.
+
+THEN, in this same pass, FIX every GATING finding you confirmed (localized edit at its cited location), re-run the suite (\`${testCommand}\`) until GREEN, and commit (Conventional Commits, type \`fix\`). Mark each such finding fixedNow:true. If a fix would need a frozen-contract change OR a re-architecture (not a localized edit), DO NOT fix it — set escalated:true and leave it for the human. Record low/non-gating findings (fixedNow:false) without fixing. Return all findings, a one-line fixSummary, and the quoted green suiteAfterFix if you changed anything.`,
+      { label: `review:${f.id}:r${round}`, phase: 'Review', schema: GROUPED_REVIEW_SCHEMA, model: 'opus' },
     )
 
-    // Self-verified findings only. (A reviewer that can't confirm omits it; this
-    // replaces the separate refutation pass for everything except high-sev sec/spec.)
-    const findings = reviews
-      .filter(Boolean)
-      .flatMap((r, i) => (r.findings ?? []).map((x, j) => ({ ...x, _fid: `${i}.${j}` })))
+    // Self-verified findings only (the reviewer omits what it couldn't confirm).
+    const findings = (review?.findings ?? [])
+      .map((x, j) => ({ ...x, _fid: String(j) }))
       .filter((x) => x.selfVerified !== false)
-    if (!findings.length) {
-      cleanRounds++
-      log(`${f.id} review round ${round}: clean.`)
-      break
-    }
+    if (review?.fixSummary) lastFixSummary = String(review.fixSummary).slice(0, 500)
 
-    // CONDITIONAL skeptic: only high-severity security/spec findings get a second
-    // adversarial pass (a false positive there is the expensive kind). One batched
-    // agent triages them all; everything else is trusted from the self-verified panel.
+    // CONDITIONAL skeptic: only high-severity security/spec findings get an
+    // independent second pass (a false positive there is the expensive kind, and
+    // the reviewer just fixed based on its own judgment — so re-check the
+    // high-stakes ones it acted on). One batched agent triages them all.
     const highStakes = findings.filter(
       (x) => x.severity === 'high' && (x.dimension === 'security' || x.dimension === 'spec-compliance'),
     )
     let refuted = new Set()
     if (highStakes.length) {
       const skeptic = await agent(
-        `Batch-TRIAGE these ${highStakes.length} high-severity security/spec finding(s) on feature ${f.id} (branch \`${build.branch}\`, worktree \`${build.worktree}\`). Read the ACTUAL code at each cited location. For EACH: real, or false-positive / already-handled / misread? Default to refuting when uncertain.\n\n${highStakes.map((x) => `[id ${x._fid}] "${x.title}" [${x.dimension}] — ${x.evidence}`).join('\n')}\n\nReturn { verdicts: [{ id, real, revisedSeverity, why }] } for every id.`,
+        `Batch-TRIAGE these ${highStakes.length} high-severity security/spec finding(s) on feature ${f.id} (worktree \`${build.worktree}\`, changes \`git diff ${diffRange}\`). Read the ACTUAL code at each cited location (the reviewer may have already fixed some — note fixedNow). For EACH: was it a real issue, or a false-positive / misread? Default to refuting when uncertain.\n\n${highStakes.map((x) => `[id ${x._fid}] "${x.title}" [${x.dimension}] fixedNow=${x.fixedNow === true} — ${x.evidence}`).join('\n')}\n\nReturn { verdicts: [{ id, real, revisedSeverity, why }] } for every id.`,
         { label: `skeptic:${f.id}:r${round}`, phase: 'Review', schema: BATCH_VERDICT_SCHEMA, model: 'opus' },
       )
       for (const v of skeptic?.verdicts ?? []) {
@@ -423,29 +397,27 @@ async function reviewFeature(build, f) {
     const realFindings = findings.filter((x) => !refuted.has(String(x._fid)))
     allConfirmed.push(...realFindings)
 
-    // Triage: gating findings MUST be fixed; low non-gating are recorded + deferred.
-    const gating = realFindings.filter((x) => x.gating || x.severity === 'high' || x.severity === 'medium')
-    if (!gating.length) {
-      log(`${f.id} review round ${round}: ${realFindings.length} confirmed (${highStakes.length} skeptic-checked), none gating — recording, stopping.`)
+    // A round is "clean" (stop looping) when nothing gating remains UNRESOLVED —
+    // i.e. every gating finding was fixedNow (or there were none). Anything
+    // escalated or left unfixed keeps it unresolved and is surfaced to the human.
+    const unresolved = realFindings.filter(
+      (x) => (x.gating || x.severity === 'high' || x.severity === 'medium') && x.fixedNow !== true,
+    )
+    if (!unresolved.length) {
+      log(`${f.id} review round ${round}: ${realFindings.length} confirmed (${highStakes.length} skeptic-checked), gating fixed inline, none unresolved — stopping.`)
       cleanRounds++
       break
     }
-
-    // Fix the gating findings on the feature branch, re-run tests. Sonnet: each
-    // finding arrives self-verified with a cited location + proposed fix —
-    // localized mechanical work. A fix needing a contract change or redesign is
-    // escalated (STOP), not improvised.
-    const fix = await agent(
-      `Fix these GATING review findings on feature ${f.id} (branch \`${build.branch}\`, worktree \`${build.worktree}\`), then re-run the suite (\`${testCommand}\`) until green and commit (Conventional Commits, type \`fix\`). ${frozenBrief}\n\nIf a fix would require changing a frozen contract, OR re-architecting rather than a localized edit, STOP and report it instead of forking the contract or guessing.\n\nGating findings:\n${JSON.stringify(gating, null, 2)}\n\nReturn a one-line summary of what you changed and the quoted green suite result.`,
-      { label: `fix:${f.id}:r${round}`, phase: 'Review', model: 'sonnet' },
-    )
-    lastFixSummary = String(fix).slice(0, 500)
-    log(`${f.id} review round ${round}: fixed ${gating.length} gating finding(s).`)
+    log(`${f.id} review round ${round}: ${unresolved.length} gating finding(s) unresolved (escalated or unfixed).`)
   }
 
   // NO per-feature verdict agent — return the raw outcome; converge folds these
   // into the shippable/blocked decision + retro for the whole batch at once.
-  const unresolvedGating = allConfirmed.filter((x) => x.gating || x.severity === 'high' || x.severity === 'medium')
+  // A gating finding the reviewer fixed inline (fixedNow) is NOT unresolved;
+  // only escalated/unfixed gating findings need the human.
+  const unresolvedGating = allConfirmed.filter(
+    (x) => (x.gating || x.severity === 'high' || x.severity === 'medium') && x.fixedNow !== true,
+  )
   return {
     featureId: f.id,
     branch: build.branch,
