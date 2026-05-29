@@ -486,10 +486,13 @@ phase('Build') // Build/Review interleave per feature via opts.phase on each age
 const featureResults = (await Promise.all(manifest.features.map((f) => runFeature(f)))).filter(Boolean)
 
 // === Phase 5: Converge =====================================================
-// NOT a real merge — that (and opening the MR) is the judgment-heavy,
-// hard-to-reverse step the human owns. This phase runs the integrated suite +
-// an end-to-end smoke on the assembled batch to surface
-// green-in-isolation/broken-on-integration, and emits the convergence report.
+// NOT a real merge into main — that (and opening the MR) is the judgment-heavy,
+// hard-to-reverse step the human owns. This phase assembles the parallel feature
+// branches onto a throwaway integration branch by CHERRY-PICK/REBASE ONLY (zero
+// merge commits — linear history is mandatory; it's verified with
+// `git log --merges` and proven in the report), runs the integrated suite + an
+// end-to-end smoke to surface green-in-isolation/broken-on-integration, and
+// emits the convergence report with an ordered, merge-free landing recipe.
 
 phase('Converge')
 
@@ -506,12 +509,13 @@ const convergence = await agent(
   `You are the integrator running the convergence review for the assembled iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each feature built on its own branch off that.
 
 DO NOT open a PR/MR and DO NOT do the final merge — the human owns landing this as one linear MR. Your job is the convergence CHECK + the per-feature verdict + the report (this phase ALSO produces the final per-feature shippable verdict + retro — there is no separate verdict step):
-1. Assemble the shippable feature branches onto an iteration-scoped throwaway integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration's integration never collides with this one). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Rebase/cherry-pick the feature branches in DAG order; resolve the predicted convergence in place. If a real conflict needs human judgment, STOP that feature and report it — don't force it.
+1. Assemble the shippable feature branches onto an iteration-scoped throwaway integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration's integration never collides with this one). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main.
+   LINEAR HISTORY IS MANDATORY — the result must have ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature branch's commits onto \`integration/${ITERATION_SLUG}\` in DAG order (\`git cherry-pick\`), or equivalently \`git rebase --onto\`. NEVER run \`git merge\` (and never \`cherry-pick -m\`/allow a merge commit) — a merge commit is a failure of this step. Resolve the predicted convergence in place as ordinary commits as you pick. If a real conflict needs human judgment, STOP that feature and report it — don't force it. After assembling, VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing; if it prints anything, you created a merge commit — redo that pick. Quote the empty result (or the linear \`git log --oneline --graph\`) into the report as proof.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch.
 3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence.`}
 4. Per feature, FINALIZE the verdict from its review outcome below: confirm shippable (every acceptance criterion met, no unresolved high/medium security or contract drift, suite green, smoke passed or honestly deferred), list unresolved gating findings needing the human, list deferred low findings, and write a tight retro — propagate any durable lesson to ARCHITECTURE/ROADMAP/an ADR/CLAUDE.md now if it is a doc you can edit on the integration branch, else note "nothing material".
 
-Then write a CONVERGENCE REPORT (as a Markdown file \`docs/CONVERGENCE-${ITERATION_SLUG}.md\` AND as your returned text) covering, per feature: branch name, shippable y/n, acceptance status, unresolved gating findings, deferred low findings, QA evidence, retro propagation made. Plus batch-level: the integrated suite result (quoted), the smoke evidence, the convergence conflicts hit + how resolved, and an ORDERED cherry-pick/rebase recipe the human can follow to build the single linear MR. End with explicit next steps for the human.
+Then write a CONVERGENCE REPORT (as a Markdown file \`docs/CONVERGENCE-${ITERATION_SLUG}.md\` AND as your returned text) covering, per feature: branch name, shippable y/n, acceptance status, unresolved gating findings, deferred low findings, QA evidence, retro propagation made. Plus batch-level: the integrated suite result (quoted), the smoke evidence, the proof of linear history (the empty \`git log --merges\` output), the convergence conflicts hit + how resolved, and an ORDERED cherry-pick recipe (exact \`git cherry-pick\`/\`git rebase\` commands, in DAG order) the human follows to land the single linear MR. State explicitly in the recipe that it uses cherry-pick/rebase only and produces NO merge commits — the human must keep main's history linear (ff-only / rebase, never \`git merge\`). End with explicit next steps for the human.
 
 Preliminary shippable (tests green, no unresolved gating): ${JSON.stringify(shippable, null, 2)}
 Preliminary blocked (needs human): ${JSON.stringify(blocked, null, 2)}`,
@@ -531,6 +535,6 @@ return {
   convergenceReport: String(convergence).slice(0, 4000),
   nextStep:
     blocked.length > 0
-      ? `Resolve the ${blocked.length} blocked feature(s) with the human, then land the shippable branches as one linear MR per the convergence report's recipe.`
-      : `All ${shippable.length} features shippable. Land them as one linear MR following the convergence report's ordered recipe, then tear down the per-feature worktrees/branches.`,
+      ? `Resolve the ${blocked.length} blocked feature(s) with the human, then land the shippable branches as one linear MR (cherry-pick/rebase only, NO merge commits) per the convergence report's recipe.`
+      : `All ${shippable.length} features shippable. Land them as one linear MR following the convergence report's ordered cherry-pick recipe (no merge commits — keep main's history linear), then tear down the per-feature worktrees/branches.`,
 }
