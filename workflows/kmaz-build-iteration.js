@@ -16,6 +16,11 @@ export const meta = {
 // ---------------------------------------------------------------------------
 // kmaz-build-iteration — phase 2 of the two-phase feature build.
 //
+// Shared pipeline conventions (model tiering — Sonnet builds/Opus reviews,
+// worktree isolation, timeless code comments, dependency-only scheduling, the
+// compound loop) live in dotmaz/skills/kmaz-pipeline/CONVENTIONS.md — the
+// canonical source; the notes below are this workflow's specifics.
+//
 // Consumes the plan kmaz-plan-iteration produced and a human approved (its
 // Status flipped to "Approved" in conversation). Runs autonomously (workflows
 // take no mid-run input). The human gate already happened — approving the plan —
@@ -646,5 +651,5 @@ return {
     ? `Push/MR-open failed: ${convergence.pushError}. The integration branch integration/${ITERATION_SLUG} is assembled locally — finish pushing + opening the MR by hand. Worktrees were preserved.`
     : leftOut.length > 0
       ? `${shipped.length} feature(s) shipped on integration/${ITERATION_SLUG}; ${mrLine}. Review/merge that MR. ${leftOut.length} feature(s) were left out — their worktrees/branches are preserved; resolve them with the human, then re-run or hand-land.`
-      : `All ${shipped.length} features shipped on integration/${ITERATION_SLUG}; ${mrLine}. Review and merge the MR (see its body for manual-review hotspots). Transient worktrees were torn down.`,
+      : `All ${shipped.length} features shipped on integration/${ITERATION_SLUG}; ${mrLine}. Review and merge the MR (see its body for manual-review hotspots). Transient worktrees were torn down. Next: any iteration that doesn't hard-depend on this one can be planned/built CONCURRENTLY with the next — every artifact is slug-scoped, so independent iterations don't collide; consult the roadmap for which are independent.`,
 }

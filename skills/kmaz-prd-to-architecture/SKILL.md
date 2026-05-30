@@ -17,6 +17,12 @@ description: >-
 
 # PRD → Defensible Architecture
 
+> **Pipeline conventions:** shared rules (model tiering, contract discipline, the teach-the-human
+> mandate, the quality bars, the compound loop) live in
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill owns HOW (the
+> system design) and is where security, non-functional, and observability decisions are MADE — see
+> the quality bars there.
+
 ## Purpose & philosophy
 
 A PRD says *what to build and why* — in behavior, technology-agnostic terms. It deliberately does
@@ -74,6 +80,7 @@ Outputs land in `docs/` (create it if absent):
 | `docs/ARCHITECTURE.md` | A **living overview**: executive summary, system + data-flow diagrams, prose on how the system fits together, and a **decision index** linking every ADR. Evolves as the design refines. | The user (to defend), `kmaz-architecture-to-roadmap` next, and every later skill that needs the system's current shape. |
 | `docs/adrs/ADR-NNN-<slug>.md` | **One file per decision**, ADR-style with full context/options/decision/rationale/tradeoffs. Largely static once accepted; a changed decision gets a *new* ADR that supersedes the old one rather than editing in place. | Anyone defending or revisiting a decision. |
 | `docs/research/*.md` | The cited research grounding (DOMAIN/TECHNOLOGY/MARKET/COMPANY + README index), produced by `kmaz-research`. | The user (to learn), and the design decisions (technology tradeoffs). |
+| `docs/architecture-diagrams/*.html` | Interactive visual explainers (modules / data flows / calls), produced by `kmaz-create-diagram` once the design is locked. | The user (to *see* and internalize the system). |
 
 `docs/research/COMPANY.md`'s **brand/voice section remains the binding design contract** the build
 phase (`kmaz-build-iteration` / `kmaz-feature-builder`) consumes for UI/copy. Keep that thread
@@ -150,6 +157,32 @@ without you. For each round:
 
 Keep questions decision-relevant. Don't ask what the PRD already answers or what you can determine
 yourself. Move round by round; record each locked decision as you go (Step 4), not batched at the end.
+
+#### Two cross-cutting rounds are MANDATORY (the quality bars)
+
+Per CONVENTIONS.md's "Quality bars," a great product is secure, scales, is observable, and is
+simple. These are architectural decisions, not review-time afterthoughts — catching a trust-boundary
+flaw at review means rebuilding; deciding it here means designing it out. Run both rounds for every
+project, teach them the same way (research-grounded options → recommend → user chooses), and record
+the outcomes as ADRs:
+
+- **Security & trust boundaries.** Walk: the authn/authz model; what data is sensitive and how it's
+  protected (in transit, at rest, in logs); the trust boundaries (where untrusted input crosses into
+  the system) and the validation strategy at each; secret handling; and any domain-specific safety
+  invariant the research surfaced (e.g. SSRF exposure for a URL-fetching feature, multi-tenant
+  isolation). Each material decision is its own ADR; the build's security review enforces against
+  them. Don't hand-wave "we'll validate inputs" — name *where* and *how*.
+- **Non-functional & operability.** Decide and record, as ADRs: the **scale/throughput** target the
+  design must hold (and the approach that meets it — and explicitly when you're deferring scale, so
+  it's a conscious choice not an omission); **performance budgets** for the load-bearing paths;
+  **availability** expectations; **data retention/compliance** if the domain demands it; and
+  **observability** — what's logged, what's measured, how an operator knows the system is healthy.
+  An unstated target can't be verified downstream, so state the ones that matter and say which you're
+  deferring.
+
+Keep these proportionate — a small internal tool needs lighter answers than a public multi-tenant
+product — but never skip the rounds. "We're deferring horizontal scale to post-MVP, single instance
+is fine for the target load (ADR-NNN)" is a perfectly good outcome; silence is not.
 
 After the core (PRD-mandated) decisions, run a **stretch-features round**: using the
 company/domain/market research, propose 2–4 features *beyond the PRD's current scope* that would (a)
@@ -288,6 +321,13 @@ Then verify the package is CTO-ready:
   `kmaz-plan-iteration` can freeze a concrete signature against it. A contract ADR that only says
   "we use a tagged union" without the shape + the consumers that must stay exhaustive is too thin —
   the build will guess. Fix it here, not downstream.
+- **Security & trust boundaries are decided, not deferred by silence.** The authn/authz model, the
+  sensitive-data protections, the trust boundaries + validation strategy, and secret handling each
+  have an ADR (or an explicit, recorded deferral). A project with untrusted input and no
+  trust-boundary ADR is incomplete.
+- **Non-functional targets are stated.** Scale/throughput, performance budgets for load-bearing
+  paths, availability, retention/compliance (where relevant), and observability each have an ADR or a
+  recorded "deferred, here's why." An unstated target can't be verified by the build.
 - **Every rationale is specific to this PRD/company**, not a generic platitude. Tie it to context.
 - **Every decision traces to a PRD requirement** (or an accepted stretch feature that was folded
   back into the PRD). No orphan decisions; no uncovered requirements.
@@ -300,10 +340,23 @@ Then verify the package is CTO-ready:
 Finish with a short summary: count of decisions, the 2–3 most consequential in a sentence each, the
 stretch features committed, and any open questions.
 
-### Step 6 — Hand off
+### Step 6 — Visualize the architecture (the human-learning artifact)
 
-The natural next step slices this architecture into a parallelizable build plan. Tell the user they
-can run **`kmaz-architecture-to-roadmap`** on the new ARCHITECTURE.md to generate a ROADMAP.md +
+Now that the system is *designed*, make it *seeable*. Mermaid diagrams in ARCHITECTURE.md are the
+defensible record; a visual explainer is how the human actually internalizes the system. Invoke the
+**`kmaz-create-diagram`** skill to produce highly-visual, interactive HTML explainers — separate ones
+for **modules**, **data flows**, and **calls** — high-level at first glance with detail revealed on
+hover/click, in a clear consultant style. Point it at the ARCHITECTURE.md + ADRs you just wrote.
+
+This is the architecture stage's contribution to the compound learning loop (CONVENTIONS.md, "Teach
+the human"): the user should leave able to *see* the system, not just read decisions about it. Offer
+it as the natural close of the design session; produce the visualizers before handing off to the
+roadmap stage so the human reviews the design visually first.
+
+### Step 7 — Hand off
+
+The natural next step slices this architecture into an iterative build plan. Tell the user they can
+run **`kmaz-architecture-to-roadmap`** on the new ARCHITECTURE.md to generate a ROADMAP.md +
 per-iteration feature specs, which then feed `kmaz-plan-iteration` → `kmaz-build-iteration`. The
 research docs carry forward, and COMPANY.md's brand section serves as the design/brand contract the
 build stages expect. Don't auto-run it; offer it as the next move.

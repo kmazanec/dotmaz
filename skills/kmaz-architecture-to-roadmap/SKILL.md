@@ -16,6 +16,11 @@ description: >-
 
 # Architecture → Iterative Roadmap (iterations as the top-level unit)
 
+> **Pipeline conventions:** shared rules (dependency-only concurrency, contract discipline, the
+> compound loop, model tiering, the artifact map) live in
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill declares the
+> dependency graph + the contracts index the plan/build stages schedule and freeze against.
+
 ## Purpose & philosophy
 
 A good architecture document says *what the system is*. A good roadmap says *how to ship it
@@ -60,23 +65,18 @@ Read by a fresh team, the roadmap must make clear:
 
 ## Dependencies, not lanes
 
-You do not sort work into parallel-vs-serial lanes — the build stages do that automatically from the
-dependency graph. Your job is to get the **hard-dependency edges** right, because they are the only
-ordering signal downstream.
+You declare the dependency graph; the build derives all concurrency from it (CONVENTIONS.md,
+"Concurrency"). You do NOT sort work into parallel-vs-serial lanes, compute a critical path, or model
+convergence rework. Your leverage is getting the **hard-dependency edges** right — a hard dep is when
+feature B consumes feature A's *not-yet-shipped behavior* (forces order); a contract-mediated soft
+dep is NOT one (B builds against the frozen contract, so leave it out — recording it needlessly
+serializes the build).
 
-A **hard dependency** is when feature B consumes feature A's *not-yet-shipped behavior* — B can't be
-built until A exists. That forces order. Everything else can build concurrently.
-
-A **contract-mediated soft dependency** is NOT a hard dependency: if B only needs a *shape* A also
-touches (a shared type, schema, API), and that shape is frozen up front, B builds against the frozen
-contract without waiting for A. Do not record these as dependencies — doing so needlessly serializes
-the build. Freezing contracts early (so soft deps don't become hard ones) is the whole point of the
-contracts table.
-
-Good decomposition **minimizes hard dependencies**: the fewer features that consume each other's
-unshipped behavior, the more the build runs concurrently. But a genuinely linear chain is fine —
-just declare it honestly and let the build serialize it. Don't contort the slicing to manufacture
-concurrency that isn't really there.
+Good decomposition **minimizes hard dependencies** so the build runs more concurrently — but a
+genuinely linear chain is fine; declare it honestly and let it serialize. Don't contort the slicing
+to manufacture concurrency that isn't there. **Across iterations**, call out which iterations are
+independent (no cross-iteration hard dep) so the human can plan/build them concurrently — that
+cross-iteration parallelism is the biggest speedup for a large product.
 
 ## The vertical-slice discipline (features as the unit of progress within an iteration)
 
@@ -130,18 +130,21 @@ implicit contracts and concurrent work will diverge. These contracts are exactly
 
 ```
 docs/
-  ROADMAP.md                       # the master artifact
+  ROADMAP.md                       # the master artifact (iteration arc, deps, contracts table)
   iterations/
     01-<iteration-slug>/
-      README.md                    # iteration overview (goal, feature list, contracts, dependency edges)
       01-<feature-slug>.md         # nested feature spec
       02-<feature-slug>.md
       ...
     02-<iteration-slug>/
-      README.md
       01-<feature-slug>.md
       ...
 ```
+
+There is **no per-iteration README**. The iteration's goal, feature list, contracts, and dependency
+edges live in ROADMAP.md (the iteration arc + the features index + the contracts table), and the
+plan stage's `BUILD-PLAN-<slug>.md` becomes the per-iteration orchestration index. A separate
+iteration README only duplicated those — the directory just holds the feature specs.
 
 - Iteration directories are numbered `NN-<slug>` in arc order.
 - Feature specs are numbered `NN-<slug>.md` **within** their iteration directory.
@@ -248,33 +251,14 @@ What we're deliberately not building / deferring (mirror the PRD's Out-of-Scope 
 Unresolved things that affect the plan but not the architecture.
 ```
 
-### Step 9 — Write each iteration directory: an overview + nested feature specs
+### Step 9 — Write each iteration's feature specs
 
-For each iteration, create `docs/iterations/NN-<slug>/`.
+For each iteration, create `docs/iterations/NN-<slug>/` and write its feature specs into it. The
+directory holds ONLY the feature specs — no README; the iteration's goal, feature list, contracts,
+and dependency edges already live in ROADMAP.md (and the plan stage builds `BUILD-PLAN-<slug>.md` as
+the per-iteration index). Each feature's own hard deps and contracts touched live in its spec below.
 
-**9a. The iteration overview** `docs/iterations/NN-<slug>/README.md`:
-
-```markdown
-# Iteration NN: <Name>
-
-**Goal:** <one sentence — what a user can do after this iteration that they could not before>
-**Status:** Not started · **Roadmap:** [../../ROADMAP.md](../../ROADMAP.md)
-
-## Features in this iteration
-| ID | Feature | Spec | One-line before → after | Depends on (hard) |
-|----|---------|------|--------------------------|--------------------|
-(Spec links the sibling file, e.g. `01-foo.md`. "Depends on" = hard deps only; blank = none.)
-
-## Shared contracts this iteration touches
-The cross-cutting contracts introduced/extended here, each citing the ADR that decided it and which
-features introduce vs. extend it. (This is what kmaz-plan-iteration freezes with signatures before
-the build.)
-
-## Definition of done for the iteration
-The iteration ships when all its feature specs are done AND <the iteration goal> is observably true.
-```
-
-**9b. One feature spec per feature**, `docs/iterations/NN-<slug>/MM-<feature-slug>.md`:
+**One feature spec per feature**, `docs/iterations/NN-<slug>/MM-<feature-slug>.md`:
 
 ```markdown
 # Feature: <Name>
@@ -354,8 +338,8 @@ Each check exists because skipping it has historically produced a bad plan:
   except infra-only features with a smoke-testable observable surface.
 - **Acceptance criteria are product behavior**, not unit acceptance.
 - **Risk-weighted ordering is honest** — the biggest unknowns de-risked early.
-- **Layout is correct:** every iteration is a `docs/iterations/NN-<slug>/` dir with a README and its
-  nested feature specs; every ROADMAP/README link resolves; feature IDs are globally unique.
+- **Layout is correct:** every iteration is a `docs/iterations/NN-<slug>/` dir holding its nested
+  feature specs (no README); every ROADMAP link resolves; feature IDs are globally unique.
 
 Then summarize for the user: number of iterations + features, the longest hard-dependency chain in
 one sentence (the genuinely-serial spine), open decisions. Point them at the next stage (see "Handing
@@ -376,6 +360,13 @@ directory; it produces the reviewable BUILD-PLAN for that iteration and STOPS at
 for approval exactly as the plan stage prescribes — the human's review gate is preserved; only the
 extra command invocation is removed. If the hook isn't available, just tell them the exact command to
 run. Do NOT chain past the approval gate, and do NOT auto-run the build — those stay user-triggered.
+
+**Name the concurrent iterations.** Per CONVENTIONS.md, cross-iteration parallelism is the biggest
+speedup for a large product, but the human has to drive it. In the handoff, explicitly call out
+which iterations are INDEPENDENT (no cross-iteration hard dep between them) and can therefore be
+planned and built CONCURRENTLY — e.g. "iterations 2 and 3 don't depend on each other; once iteration
+1's contracts are frozen you can run both in parallel (each is slug-scoped, so they won't collide)."
+Don't make the user infer the concurrency from the dependency graph — hand it to them.
 
 ## Notes on judgment
 

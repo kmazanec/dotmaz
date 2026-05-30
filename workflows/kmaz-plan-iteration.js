@@ -15,6 +15,11 @@ export const meta = {
 // ---------------------------------------------------------------------------
 // kmaz-plan-iteration — phase 1 of the two-phase feature build.
 //
+// Shared pipeline conventions (model tiering, dependency-only concurrency,
+// contract discipline, the compound loop) live in
+// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md — the canonical source; the notes
+// below are this workflow's specifics.
+//
 // WHY two phases: a workflow can't take mid-run user input, but the build needs
 // a human plan-approval gate. So planning and building are separate workflows:
 // THIS one emits a complete, reviewable plan and STOPS; the human approves it in
@@ -24,9 +29,10 @@ export const meta = {
 // build workflow, so nothing lands before approval.
 //
 // LAYOUT: kmaz-architecture-to-roadmap makes iterations the top-level unit —
-// docs/iterations/NN-<slug>/ holds an overview (README.md) + nested feature
-// specs (MM-<slug>.md). This workflow is pointed at ONE iteration dir and plans
-// every spec in it. Older projects use a flat docs/features/ dir with the
+// docs/iterations/NN-<slug>/ holds the nested feature specs (MM-<slug>.md) and
+// nothing else (no README; the roadmap + BUILD-PLAN carry the iteration goal +
+// index). This workflow is pointed at ONE iteration dir and plans every spec in
+// it. Older projects use a flat docs/features/ dir with the
 // iteration grouping in ROADMAP.md / each spec's "Iteration:" field; pass
 // `featuresDir` + `iteration` for those (the Scope agent handles both).
 //
@@ -218,15 +224,15 @@ phase('Scope')
 
 // FIND THE NEXT INCOMPLETE ITERATION (only when the caller didn't name one and
 // we're not in legacy flat mode). A cheap Haiku agent walks docs/iterations/ in
-// order and returns the first iteration directory that is NOT yet done — by its
-// README "Status" and whether its feature specs still have unchecked build-plan
-// boxes / unbuilt code. This replaces the old hardcoded 'docs/iterations/01-*'
-// default, which always planned iteration 1 even after it shipped.
+// order and returns the first iteration directory that is NOT yet done — judged
+// from its feature specs (there is no per-iteration README). This replaces the
+// old hardcoded 'docs/iterations/01-*' default, which always planned iteration 1
+// even after it shipped.
 if (!ITERATION_DIR && !LEGACY) {
   const finder = await agent(
     `Find the NEXT INCOMPLETE iteration to plan. Read-only — do NOT write anything.
 
-List \`docs/iterations/\` in numeric order (01-, 02-, ...). For each iteration dir, decide if it is DONE: check its \`README.md\` Status, and whether its feature specs (the NN-<slug>.md files) show the work is finished — a "## Build plan (approved)" section with all boxes ticked, or shipped code/tests that satisfy its acceptance criteria. An iteration with no plan yet, or unchecked boxes, or unbuilt features is NOT done.
+List \`docs/iterations/\` in numeric order (01-, 02-, ...). Iteration dirs hold ONLY feature specs (NN-<slug>.md) — there is no README. For each dir, decide if it is DONE from its feature specs: an iteration is DONE when every feature spec has a "## Build plan (approved)" section with all checkboxes ticked AND a "### Build outcome" note marking it shipped. An iteration is NOT done if any spec has no build plan yet, unticked boxes, or no shipped build-outcome. (A \`BUILD-PLAN-<slug>.md\` in the dir whose Status is "Approved" but whose specs aren't all shipped means it's planned-but-building — also not done.)
 
 Return the FIRST iteration dir (in numeric order) that is not done — that's the one to plan next. If every iteration looks done, return the highest-numbered one and set allDone=true (the human likely wants to add a new iteration). If \`docs/iterations/\` doesn't exist, set notFound=true.`,
     { label: 'find-next-iteration', phase: 'Scope', model: 'haiku', schema: {
@@ -259,10 +265,10 @@ ${
     ? `This project uses the LEGACY FLAT layout: feature specs live directly in \`${FEATURES_DIR}\` as NN-<slug>.md files, and the iteration grouping lives in the roadmap / each spec's "Iteration:" field (there is no per-iteration directory). Read, in order:
 1. The roadmap at \`${ROADMAP}\` — the iteration arc, the cross-cutting contracts table (each contract cites the ADR that decided it), and the per-feature hard-dependency edges.
 2. The feature specs in \`${FEATURES_DIR}\`. ${ITERATION ? `Select ONLY the specs belonging to iteration "${ITERATION}" (by the roadmap's grouping or each spec's "Iteration:" field).` : 'No iteration was named — infer the iteration to plan from the roadmap (prefer the earliest not-yet-built one) and report which you chose in iterationName.'}`
-    : `Iterations are the top-level unit: \`${ITERATION_DIR}\` is an iteration directory containing an iteration overview (README.md) + its nested feature specs (NN-<slug>.md). Read, in order:
-1. The iteration overview \`${ITERATION_DIR.replace(/\/$/, '')}/README.md\` — the iteration goal, its feature list, the shared contracts it touches (each citing an ADR), and the per-feature hard-dependency edges.
-2. EVERY feature spec nested in \`${ITERATION_DIR}\` (the NN-<slug>.md files — these are the features to plan).
-3. The roadmap at \`${ROADMAP}\` for cross-iteration context — the iteration arc and the contracts table.
+    : `Iterations are the top-level unit: \`${ITERATION_DIR}\` is an iteration directory holding its nested feature specs (NN-<slug>.md) and nothing else (there is no README). Read, in order:
+1. The roadmap at \`${ROADMAP}\` — find THIS iteration in the iteration arc (its one-sentence goal), the features index (this iteration's features + their hard-dependency edges), and the cross-cutting contracts table (each contract citing the ADR that decided it). The roadmap is where the iteration goal + dependency edges + contracts live now.
+2. EVERY feature spec nested in \`${ITERATION_DIR}\` (the NN-<slug>.md files — these are the features to plan; each spec carries its own hard deps and the contracts it touches).
+3. The ADRs the contracts cite, so you carry the real contract shapes forward to the freeze step.
 
 If \`${ITERATION_DIR}\` does not exist, the project may use the legacy flat \`docs/features/\` layout instead — fall back to reading the roadmap + the flat specs dir, select this iteration's specs, and set a blocker noting the layout mismatch so the human can re-invoke with featuresDir set.`
 }
@@ -420,13 +426,17 @@ await parallel(
     return agent(
       `Persist the approved build plan for feature ${plan.featureId} into its spec file \`${feat?.specPath}\`. This section is the SINGLE source of truth for how this feature is built — the orchestration index will link here, not duplicate it.
 
-Append (in or above the spec's "Implementation notes" section) a "## Build plan (approved)" section as a Markdown CHECKBOX list — one \`- [ ]\` item per chunk, in order, each line stating: the chunk title, what it delivers, the acceptance criteria it satisfies, the specific test target(s) that prove it, and its contract touchpoint. Then a "### Test strategy", "### Contract touchpoints" (contract / action / frozen signature), "### Manual setup", and "### Risks" subsection from the plan below. Do NOT alter the rest of the spec.
+Append (in or above the spec's "Implementation notes" section) a "## Build plan (approved)" section as a Markdown CHECKBOX list — one \`- [ ]\` item per chunk, in order, each line stating: the chunk title, what it delivers, the acceptance criteria it satisfies, the specific test target(s) that prove it, and its contract touchpoint. Then a "### Test strategy", "### Contract touchpoints" (contract / action / frozen signature), "### Manual setup", and "### Risks" subsection from the plan below.
+
+This is pure transcription of the plan below into Markdown — do NOT summarize, reword, omit, or reorder it, and do NOT alter ANY existing content in the spec (read the file, insert the new section, leave every other byte unchanged).
 
 The plan:
 ${JSON.stringify(plan, null, 2)}
 
 After writing, confirm the file path and the number of checkbox items written.`,
-      { label: `persist:${plan.featureId}`, phase: 'Persist', model: 'sonnet' },
+      // Haiku: pure transcription of structured plan JSON into a Markdown section,
+      // inserted into a spec the human reviews at the approval gate. No judgment.
+      { label: `persist:${plan.featureId}`, phase: 'Persist', model: 'haiku' },
     )
   }),
 )

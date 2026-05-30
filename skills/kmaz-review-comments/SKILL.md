@@ -9,6 +9,10 @@ description: >-
 
 # Review Comments → Fixes + Durable Lessons
 
+> **Pipeline conventions:** the compound learning loop (propagating durable lessons upstream) and
+> other shared rules live in [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md).
+> This skill is where review feedback enters that loop.
+
 ## What this is for
 
 A PR review is two things at once: a list of *changes to make to this PR*, and a stream

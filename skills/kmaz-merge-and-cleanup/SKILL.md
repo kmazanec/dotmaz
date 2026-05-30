@@ -15,6 +15,10 @@ description: >-
 
 # Merge and Cleanup
 
+> **Pipeline conventions:** shared rules (worktree isolation, linear history, the hard git rules)
+> live in [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill is the
+> closer; it follows those and adds the conservative landing process below.
+
 ## What this is for
 
 The closer of the suite. `kmaz-architecture-to-roadmap` plans, `kmaz-feature-builder` builds and

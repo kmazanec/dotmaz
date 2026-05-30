@@ -15,6 +15,10 @@ export const meta = {
 // ---------------------------------------------------------------------------
 // kmaz-research — the shared, reusable research fan-out for the kmaz pipeline.
 //
+// Shared pipeline conventions (model tiering, the fan-out + adversarial-verify
+// shape, the teach-the-human mandate this grounds) live in
+// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md.
+//
 // WHY a workflow: research is the canonical fan-out + adversarial-verify shape
 // workflows exist for. Independent investigators cover different angles in
 // parallel; a verify pass tries to REFUTE each load-bearing claim so the output
@@ -159,7 +163,9 @@ Produce a research frame: a one-paragraph gist of the project, and for EACH of t
 - company: ${COMPANY ? `"${COMPANY}"'s business model, tech stack (from job posts/eng blogs/talks/GitHub), founders & technical leadership and their public engineering values, and brand/voice (visual + copy).` : '(skipped — no company)'}
 
 Return the structured frame covering only [${requested.join(', ')}].`,
-  { label: 'frame', phase: 'Frame', schema: FRAME_SCHEMA, model: 'opus' },
+  // Sonnet: turning a brief into per-domain research questions is light reasoning,
+  // not the deep kind. (Was opus.)
+  { label: 'frame', phase: 'Frame', schema: FRAME_SCHEMA, model: 'sonnet' },
 )
 
 const domainsToRun = (frame.domains ?? []).filter((d) => requested.includes(d.domain))
@@ -272,7 +278,9 @@ Then a short "## Caveats" section: anything the research could NOT establish, an
 
 Files written: ${verifiedDomains.map((d) => `${OUT_DIR}/${FILE_FOR[d.domain]}`).join(', ')}
 Project gist: ${frame.projectGist}`,
-  { label: 'write-index', phase: 'Write', model: 'opus' },
+  // Sonnet: assemble an index table + caveats from already-written files —
+  // light judgment (per-file confidence rollup), no deep reasoning. (Was opus.)
+  { label: 'write-index', phase: 'Write', model: 'sonnet' },
 )
 
 log(`Research complete. ${verifiedDomains.length} file(s) under ${OUT_DIR}/ + README index.`)
