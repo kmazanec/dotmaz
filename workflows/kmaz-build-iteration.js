@@ -48,26 +48,45 @@ export const meta = {
 // nested specPath, so this workflow stays layout-agnostic — it reads whatever
 // paths the manifest names.
 //
-// `args`:
-//   { manifestPath?: string,  // path to the iteration's BUILD-PLAN.md (caller passes the real one)
-//     buildBranch?: string,   // base branch the contracts land on + features fork from
-//     reviewRounds?: number,  // max loop-until-clean review rounds per feature (default 3)
-//     skipAppSmoke?: boolean } // skip the app-driving QA/smoke (only if no runnable surface)
+// `args` — accepted in TWO forms (the skill/slash-command invocation passes a
+// BARE STRING; a programmatic caller may pass the object):
+//   "<path-to-BUILD-PLAN.md>"   // bare string, optional leading '@' (slash-command form)
+//   { manifestPath?: string,    // path to the iteration's BUILD-PLAN.md (caller passes the real one)
+//     buildBranch?: string,     // base branch the contracts land on + features fork from
+//     reviewRounds?: number,    // max loop-until-clean review rounds per feature (default 1)
+//     skipAppSmoke?: boolean }  // skip the app-driving QA/smoke (only if no runnable surface)
 // ---------------------------------------------------------------------------
 
-// Current layout puts the manifest in the iteration dir; the LEGACY flat
-// layout (docs/features/ projects) puts it at docs/BUILD-PLAN.md. The Load
-// agent tolerates either, and the build is layout-agnostic regardless since it
-// follows the specPaths the manifest carries.
-const MANIFEST_PATH = args?.manifestPath ?? 'docs/iterations/01-*/BUILD-PLAN.md'
-const BUILD_BRANCH = args?.buildBranch ?? null // resolved by the load agent if null
+// Normalize args: a bare string IS the manifest path (the slash-command form),
+// otherwise read the object's fields. Strip a leading '@' (the @file sugar the
+// slash command uses) and surrounding whitespace.
+const _argStr = typeof args === 'string' ? args : null
+const _manifestPathArg =
+  _argStr ?? (typeof args?.manifestPath === 'string' ? args.manifestPath : null)
+const MANIFEST_PATH = _manifestPathArg
+  ? _manifestPathArg.trim().replace(/^@/, '')
+  : null
+
+// HARD STOP on a missing manifest path. We MUST NOT fall back to a hardcoded
+// iteration glob: doing so silently built the WRONG (already-shipped) iteration
+// once — the caller named iteration 03, the bare-string arg didn't match the
+// object-shaped `args?.manifestPath` lookup, and the old `?? 'docs/iterations/01-*/...'`
+// default made the load agent build iteration 01 instead. Refuse rather than guess.
+if (!MANIFEST_PATH) {
+  log('⛔ No BUILD-PLAN manifest path provided. Pass the iteration\'s BUILD-PLAN.md as args (a bare string path, optionally @-prefixed, or { manifestPath }). Refusing to guess an iteration — guessing once built an already-shipped iteration.')
+  return { stopped: true, reason: 'no-manifest-path' }
+}
+const BUILD_BRANCH =
+  (typeof args === 'object' && args?.buildBranch) ? args.buildBranch : null // resolved by the load agent if null
 // Default 1 (was 3): the plan-iteration pass already ran architect/researcher/
 // contrarian drafts + a contract reconciliation that verified every signature
 // against real code, so the build review is a confirmation pass, not a from-
 // scratch audit. Round 2 only runs if a round-1 fix landed gating changes AND
 // the caller raised reviewRounds.
-const MAX_REVIEW_ROUNDS = Number.isInteger(args?.reviewRounds) ? args.reviewRounds : 1
-const SKIP_APP_SMOKE = args?.skipAppSmoke === true
+// These only apply in the object form; a bare-string arg leaves them at defaults.
+const _argsObj = typeof args === 'object' && args ? args : {}
+const MAX_REVIEW_ROUNDS = Number.isInteger(_argsObj.reviewRounds) ? _argsObj.reviewRounds : 1
+const SKIP_APP_SMOKE = _argsObj.skipAppSmoke === true
 
 // === Schemas ===============================================================
 
@@ -218,7 +237,7 @@ phase('Load')
 const manifest = await agent(
   `Read the approved build manifest at \`${MANIFEST_PATH}\` and the per-feature "Build plan (approved)" sections in each spec it references. This is read-only.
 
-If that exact path doesn't exist, the manifest may live elsewhere depending on the project's docs layout: the current layout writes it inside the iteration dir (\`docs/iterations/NN-<slug>/BUILD-PLAN.md\`); the LEGACY flat layout writes it slug-scoped at \`docs/BUILD-PLAN-<iteration-slug>.md\`. Locate THIS iteration's BUILD-PLAN under \`docs/\` and use it (if several exist, they are different iterations — pick the one the caller meant). The feature specs may correspondingly be either nested under an iteration dir or flat in \`docs/features/\` — follow whatever specPaths the manifest names; the build is layout-agnostic.
+The caller named THIS exact manifest path — it is authoritative. Read that file. If a literal \`${MANIFEST_PATH}\` is not on disk, it may be a glob/layout variant of the SAME iteration: e.g. \`docs/iterations/<slug>/BUILD-PLAN.md\` vs \`docs/iterations/<slug>/BUILD-PLAN-<slug>.md\` (current nested layout) or \`docs/BUILD-PLAN-<slug>.md\` (legacy flat layout) — resolve it to the SAME iteration's BUILD-PLAN only. You MUST NOT substitute a DIFFERENT iteration's manifest: if the path names iteration \`<slug>\` and no BUILD-PLAN for \`<slug>\` exists, set approved=false with an explanation and STOP — do NOT pick another iteration's plan. (Guessing a different iteration once silently built an already-shipped iteration.) The feature specs may be nested under the iteration dir or flat in \`docs/features/\` — follow whatever specPaths the manifest names; the build is layout-agnostic.
 
 Determine:
 - Whether the plan is APPROVED. It is approved only if its Status is NOT "Awaiting approval" (a human flips it, e.g. to "Approved") AND its Blockers list is empty/"None". If it still says awaiting-approval or has blockers, set approved=false and explain — the build must NOT proceed on an unapproved plan.
