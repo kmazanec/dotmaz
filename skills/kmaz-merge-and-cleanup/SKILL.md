@@ -8,7 +8,7 @@ description: >-
   merge/land/integrate a finished branch, "merge this into main", "land the feature",
   "ff-merge and clean up", "rebase and merge then delete the worktree", or otherwise
   finish and tidy up a development branch after the work and review are done. It is the
-  natural follow-on to kmaz-feature-builder (which ends at an open, rebased PR). Trigger even
+  natural follow-on to kmaz-feature (which can end at an open, rebased PR). Trigger even
   if the user doesn't name this skill, as long as they're asking to merge a branch into
   main and tidy up afterward.
 ---
@@ -23,10 +23,10 @@ description: >-
 
 ## What this is for
 
-The closer of the suite. `kmaz-architecture-to-roadmap` plans, `kmaz-feature-builder` builds and
-opens a rebased PR; this skill takes a finished, reviewed branch and **lands it into main
-with a linear history, without ever clobbering unrelated work, then removes the scaffolding**
-(branch + worktree).
+The closer of the suite. The pipeline plans and builds (`kmaz-build-iteration` for a planned
+iteration, `kmaz-feature` for a single brownfield feature); this skill takes a finished, reviewed
+branch and **lands it into main with a linear history, without ever clobbering unrelated work, then
+removes the scaffolding** (branch + worktree).
 
 The whole skill is organized around one priority order: **never destroy unrelated work >
 keep history linear > be autonomous.** When those conflict, the earlier one wins. Other

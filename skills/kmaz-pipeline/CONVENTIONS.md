@@ -42,6 +42,12 @@ The stages, in order, and the artifact each consumes/produces:
 | Merge | `kmaz-merge-and-cleanup` (skill) | a finished feature branch | linear `main`, scaffolding removed |
 | Review | `kmaz-review-comments` (skill) | an open PR/MR with feedback | fixes + durable lessons propagated upstream |
 
+The stages above are the full **greenfield** pipeline: a whole product, planned across many iterations.
+For adding **ONE feature to an existing (brownfield) project**, `kmaz-feature` (skill) runs this entire
+pipeline compressed into a single skill — interview → ground → lock → plan → build → report — producing
+just one feature doc. Same conventions, in miniature. Use it instead of the full chain when the work is
+one feature on a codebase that already exists.
+
 `docs/STATUS.md` is the **rolling re-entry point** — a single short doc answering "where are we, what
 shipped, what's next" without reading five files. The roadmap stage seeds it (every iteration +
 feature, all "not started"); the build stage updates it at convergence (mark each shipped/blocked,

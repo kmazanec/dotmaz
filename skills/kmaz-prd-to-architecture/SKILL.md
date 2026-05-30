@@ -84,8 +84,8 @@ Outputs land in `docs/` (create it if absent):
 | `docs/architecture-diagrams/*.html` | Interactive visual explainers (modules / data flows / calls), produced by `kmaz-create-diagram` once the design is locked. | The user (to *see* and internalize the system). |
 
 `docs/research/COMPANY.md`'s **brand/voice section remains the binding design contract** the build
-phase (`kmaz-build-iteration` / `kmaz-feature-builder`) consumes for UI/copy. Keep that thread
-unbroken.
+phase (`kmaz-build-iteration`, or `kmaz-feature` for a later single feature) consumes for UI/copy.
+Keep that thread unbroken.
 
 The split between ARCHITECTURE.md and ADRs matters: the overview gets edited dozens of times as the
 project evolves; the ADRs are the durable record of *why* and shouldn't churn. Mixing them buries
