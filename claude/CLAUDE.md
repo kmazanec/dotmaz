@@ -4,6 +4,18 @@ These apply to every session, in every project, regardless of which skill or
 workflow is active. A project's own `CLAUDE.md` may add to these; where they
 genuinely conflict, the project file wins.
 
+## Asking Questions
+
+Whenever I ask a question, just answer it, do not do anything else unless I ask you
+do to something else, too. Whenever there is a question, answer it first.
+
+## Git commits
+
+Generally use conventional commits
+
+Never use git add -A or git add .
+Always commit only what you changed, ignore other changes, those are from the user or other agents
+
 ## Git: branch & worktree isolation
 
 The primary worktree is yours and mine. Its branch is sacred.
