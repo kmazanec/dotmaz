@@ -257,17 +257,19 @@ const scopeBrief = `You are scoping the build of ONE roadmap iteration. This is 
 ${
   LEGACY
     ? `This project uses the LEGACY FLAT layout: feature specs live directly in \`${FEATURES_DIR}\` as NN-<slug>.md files, and the iteration grouping lives in the roadmap / each spec's "Iteration:" field (there is no per-iteration directory). Read, in order:
-1. The roadmap at \`${ROADMAP}\` — the iteration arc, the cross-cutting contracts table, the parallelism map, the critical path.
+1. The roadmap at \`${ROADMAP}\` — the iteration arc, the cross-cutting contracts table (each contract cites the ADR that decided it), and the per-feature hard-dependency edges.
 2. The feature specs in \`${FEATURES_DIR}\`. ${ITERATION ? `Select ONLY the specs belonging to iteration "${ITERATION}" (by the roadmap's grouping or each spec's "Iteration:" field).` : 'No iteration was named — infer the iteration to plan from the roadmap (prefer the earliest not-yet-built one) and report which you chose in iterationName.'}`
     : `Iterations are the top-level unit: \`${ITERATION_DIR}\` is an iteration directory containing an iteration overview (README.md) + its nested feature specs (NN-<slug>.md). Read, in order:
-1. The iteration overview \`${ITERATION_DIR.replace(/\/$/, '')}/README.md\` — the iteration goal, its feature list, the shared contracts it touches, its parallelism, and its concurrency with other iterations.
+1. The iteration overview \`${ITERATION_DIR.replace(/\/$/, '')}/README.md\` — the iteration goal, its feature list, the shared contracts it touches (each citing an ADR), and the per-feature hard-dependency edges.
 2. EVERY feature spec nested in \`${ITERATION_DIR}\` (the NN-<slug>.md files — these are the features to plan).
-3. The roadmap at \`${ROADMAP}\` for cross-iteration context — the contracts table, the critical path, what other iterations are concurrent.
+3. The roadmap at \`${ROADMAP}\` for cross-iteration context — the iteration arc and the contracts table.
 
 If \`${ITERATION_DIR}\` does not exist, the project may use the legacy flat \`docs/features/\` layout instead — fall back to reading the roadmap + the flat specs dir, select this iteration's specs, and set a blocker noting the layout mismatch so the human can re-invoke with featuresDir set.`
 }
 ${ITERATION ? `(Iteration: "${ITERATION}".)` : ''}
 ${EXPLICIT_FEATURES ? `Plan ONLY these features (override the dir's set): ${EXPLICIT_FEATURES.join(', ')}.` : ''}
+
+LEARN FROM ALREADY-BUILT ITERATIONS (the compound loop). Before planning, skim the EARLIER iteration directories (the lower-numbered ones under docs/iterations/, or earlier specs in the flat dir) for what the build stage recorded there: each built feature's spec carries a "### Build outcome" note (under its "## Build plan (approved)" section) and may carry Implementation-notes/retro lessons; durable lessons may also have landed in ROADMAP.md or ADRs. Pull forward anything that should shape THIS iteration's plan — a contract that needed an extra variant in practice, a feature that proved harder/simpler than scoped, a pattern flagged as a footgun, a test approach that worked. Don't re-plan finished work; just let what the project already learned inform the plans you draft now. (If no earlier iterations are built yet, skip this.)
 
 Then, for EACH feature you'll plan:
 - Read its spec in full: description, dependencies, acceptance criteria, testing requirements, manual setup.
@@ -381,7 +383,7 @@ const depEdges = (scope.features ?? []).map((f) => ({ featureId: f.id, after: f.
 const contractSpec = await agent(
   `You are the integrator locking the shared contracts for the build BEFORE any code is written.
 
-Declared shared contracts (from scope):
+Declared shared contracts (from scope — each names its source of truth, normally the ADR that decided it):
 ${JSON.stringify(scope.sharedContracts ?? [], null, 2)}
 
 Each feature's contract touchpoints (what it introduces/consumes/extends + the signature it needs):
@@ -390,8 +392,10 @@ ${JSON.stringify(touchpointsByFeature, null, 2)}
 Hard-dependency edges (a feature consumes another's shipped behavior → must build after it):
 ${JSON.stringify(depEdges, null, 2)}
 
+THE ARCHITECTURE IS THE AUTHORITY. Before freezing anything, READ the source-of-truth ADR each contract cites (e.g. docs/adrs/ADR-NNN-*.md) and any existing code at that source of truth. The ADR already decided the contract's shape and rationale — freeze a signature CONSISTENT with it, do not re-decide or contradict it. If a feature's needed touchpoint can't be reconciled with its ADR (the ADR forbids the shape it needs, or two features need incompatible extensions the ADR doesn't anticipate), that's an architecture gap: do NOT paper over it with an improvised contract — note it so the human can resolve it at the ADR. If a contract cites no ADR, treat the existing code + the feature touchpoints as the authority and freeze the minimum-viable shape.
+
 Do two things:
-1. RECONCILE every shared contract across all features into ONE frozen spec. For each contract, pre-commit EVERY feature's additive extension (new enum member / union variant / optional wire field) TOGETHER with every consumer that must stay exhaustive over it (every switch, validator, provider schema). A shared extensible type and the code that must handle all its cases are ONE contract — landing the members up front turns N late breaks into zero. Give each a minimum-viable frozen \`signature\` the build workflow will implement and commit before any feature work.
+1. RECONCILE every shared contract across all features into ONE frozen spec, consistent with the cited ADRs. For each contract, pre-commit EVERY feature's additive extension (new enum member / union variant / optional wire field) TOGETHER with every consumer that must stay exhaustive over it (every switch, validator, provider schema). A shared extensible type and the code that must handle all its cases are ONE contract — landing the members up front turns N late breaks into zero. Give each a minimum-viable frozen \`signature\` the build workflow will implement and commit before any feature work.
 2. Emit \`buildOrder\`: one entry per feature with its \`after\` list (the hard-dep edges above, deduped and reconciled — a feature with no hard dep gets an empty \`after\`). This is the ONLY ordering artifact; the build schedules from it directly. Do NOT invent parallel/serial lanes, a critical path, or convergence bookkeeping — the dependency edges ARE the schedule.
 
 Return the structured contract spec. Do NOT write or commit code — you are specifying signatures for the build phase to implement.`,

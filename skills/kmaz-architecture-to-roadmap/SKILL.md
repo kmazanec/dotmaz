@@ -1,27 +1,26 @@
 ---
 name: kmaz-architecture-to-roadmap
 description: >-
-  Decompose an architecture/design document (and the PRD behind it) into an iterative,
-  parallelizable roadmap a cross-functional team can ship against. Iterations are the TOP-LEVEL
-  unit of the plan; features are nested inside them. Output is a ROADMAP.md (the master artifact:
-  the iteration arc + DAG, cross-cutting contracts, parallelism map, critical path) plus a
-  docs/iterations/NN-name/ directory per iteration containing an iteration overview and its nested
-  vertical-slice feature specs. Every feature is a chunk of new user-observable functionality, sized
-  so that after every merge the system is more capable and still shippable. Use whenever the user
-  has an architecture/design/spec and wants it turned into buildable work — "turn this into a
-  roadmap", "break this into iterations/features", "plan the build", "decompose this for a team",
-  "make this parallelizable". This is the third stage of the build pipeline; its per-iteration
-  output is exactly what kmaz-plan-iteration consumes. Trigger even when the user doesn't say
-  "roadmap", as long as they have a design and want a delivery plan.
+  Decompose an architecture/design document (and the PRD behind it) into an iterative roadmap a
+  team can ship against. Iterations are the TOP-LEVEL unit of the plan; features are nested inside
+  them. Output is a ROADMAP.md (the master artifact: the iteration arc, per-feature hard-dependency
+  edges, and the cross-cutting contracts table) plus a docs/iterations/NN-name/ directory per
+  iteration containing an iteration overview and its nested vertical-slice feature specs. Every
+  feature is a chunk of new user-observable functionality, sized so that after every merge the
+  system is more capable and still shippable. Use whenever the user has an architecture/design/spec
+  and wants it turned into buildable work — "turn this into a roadmap", "break this into
+  iterations/features", "plan the build", "decompose this for a team". This is the third stage of
+  the build pipeline; its per-iteration output is exactly what kmaz-plan-iteration consumes. Trigger
+  even when the user doesn't say "roadmap", as long as they have a design and want a delivery plan.
 ---
 
-# Architecture → Iterative, Parallelizable Roadmap (iterations as the top-level unit)
+# Architecture → Iterative Roadmap (iterations as the top-level unit)
 
 ## Purpose & philosophy
 
-A good architecture document says *what the system is*. A good roadmap says *how a cross-functional
-team races to ship it without serializing on each other and without landing a working product only
-at the very end*.
+A good architecture document says *what the system is*. A good roadmap says *how to ship it
+incrementally — never landing a working product only at the very end, and never blocking work on a
+dependency that didn't have to exist yet*.
 
 This skill produces **ROADMAP.md — the master strategy artifact** — plus, **per iteration**, a
 directory holding that iteration's overview and its nested feature specs. **The iteration is the
@@ -29,21 +28,24 @@ top-level unit of the plan; features live underneath it.** This matters because 
 (`kmaz-plan-iteration`) plans and builds *one iteration at a time* — so the iteration is the natural
 thing you point a builder at, and features are its components, not free-floating work items.
 
+**You declare dependencies; the downstream derives concurrency.** This skill does NOT model
+parallelism — no parallelism map, no critical path, no convergence-point bookkeeping. Its job is to
+state, per feature, what it *hard-depends on* (consumes another feature's not-yet-shipped behavior)
+and which *contracts* bind features together. `kmaz-plan-iteration` and `kmaz-build-iteration`
+schedule every bit of concurrency straight off that dependency graph: anything with no hard dep runs
+concurrently, anything with one waits — for free, no lanes to plan. Spend your effort on the right
+decomposition and honest dependency edges, not on predicting how much it parallelizes.
+
 Read by a fresh team, the roadmap must make clear:
 
 1. **The iteration arc** — what user-observable capability ships at each milestone, in what order,
    what is deferred. Each iteration is a *shippable* state of the product; after every iteration
    merges, the system is more capable than before and still shippable.
-2. **Which iterations and features parallelize and which serialize** — at three levels (below).
-3. **The cross-cutting contracts** that bind parallel workstreams, where each contract's source of
-   truth lives, who owns it, how change propagates.
-4. **The convergence/merge points** where parallel streams meet and the rework expected at each.
-5. **The critical path** — the longest *serial* chain of features (across iterations) that cannot
-   be parallelized regardless of staffing. The true ship-date determiner.
-
-The mental model: **a cross-functional engineering team racing to ship.** Workstreams run
-concurrently, communicate via contracts agreed up front, and absorb real rework where streams
-converge. The roadmap plans for that rework rather than pretending it doesn't exist.
+2. **The hard-dependency edges** — per feature, which other features it consumes shipped behavior
+   from. This is the *only* ordering signal the build stages use; keep it minimal and real.
+3. **The cross-cutting contracts** that bind features — each one *indexed to the ADR that decided
+   it* (the architecture is the source of truth), with its introducing feature and extending
+   features. These are exactly what `kmaz-plan-iteration` freezes before the build.
 
 ## Inputs
 
@@ -56,23 +58,25 @@ converge. The roadmap plans for that rework rather than pretending it doesn't ex
   contract that the build stage will consume.
 - **Existing repo state** — if pieces are partly built, the first iteration picks up from there.
 
-## Three levels of parallelism
+## Dependencies, not lanes
 
-This skill plans for parallel work at **all three** levels. Confusing them produces bad plans.
+You do not sort work into parallel-vs-serial lanes — the build stages do that automatically from the
+dependency graph. Your job is to get the **hard-dependency edges** right, because they are the only
+ordering signal downstream.
 
-1. **Sub-tasks inside a feature.** A vertical-slice feature may break into 2–5 sub-tasks touching
-   different files/layers, implemented concurrently as sub-agent workstreams, merging in the
-   feature's single PR. (`kmaz-plan-iteration` plans these; `kmaz-build-iteration` runs them.)
-2. **Features inside an iteration.** Multiple vertical-slice features that share no conflicting code
-   paths ship as separate PRs in the same iteration. When all the iteration's features merge, the
-   iteration is shipped. **This is the level `kmaz-plan-iteration`/`kmaz-build-iteration` operate
-   on — one iteration's features, built in parallel.**
-3. **Iterations themselves.** Two iterations can be in-flight at once when their dependencies don't
-   conflict, OR a shared dependency is already shipped, OR the shared dependency is a *locked
-   contract* whose shape is frozen even if its implementation is in-flight.
+A **hard dependency** is when feature B consumes feature A's *not-yet-shipped behavior* — B can't be
+built until A exists. That forces order. Everything else can build concurrently.
 
-What does **not** parallelize: features that directly depend on each other; iterations whose
-acceptance includes another iteration's not-yet-shipped behavior. Good decomposition minimizes both.
+A **contract-mediated soft dependency** is NOT a hard dependency: if B only needs a *shape* A also
+touches (a shared type, schema, API), and that shape is frozen up front, B builds against the frozen
+contract without waiting for A. Do not record these as dependencies — doing so needlessly serializes
+the build. Freezing contracts early (so soft deps don't become hard ones) is the whole point of the
+contracts table.
+
+Good decomposition **minimizes hard dependencies**: the fewer features that consume each other's
+unshipped behavior, the more the build runs concurrently. But a genuinely linear chain is fine —
+just declare it honestly and let the build serialize it. Don't contort the slicing to manufacture
+concurrency that isn't really there.
 
 ## The vertical-slice discipline (features as the unit of progress within an iteration)
 
@@ -105,18 +109,22 @@ outside its own code, and (b) the thinnest possible cut, not a "build all the in
 ## Cross-cutting contracts
 
 Things that span features and must stay consistent — a typed message schema, a shared validator, a
-design contract, a telemetry shape, an accessibility standard — are **contracts, not features**. The
-roadmap names them, locates each one's source of truth, identifies the introducing feature and the
-consuming/extending features, and predicts where parallel streams reconcile.
+design contract, a telemetry shape, an accessibility standard — are **contracts, not features**.
 
-For each contract: name + one-line description; source-of-truth file; **introducing feature**;
-**consuming features**; **change protocol** (how a feature propagates a change). When two parallel
-features modify the same contract, name it a **convergence point**: where rework happens, who
-absorbs it, what test covers the merged behavior.
+**The architecture already decided these; you index them, you don't redefine them.** Most
+cross-cutting contracts trace to an ADR (the architecture stage's "Consequences for the build"
+sections are exactly this — "all persistence uses Drizzle", "auth is session-cookie", "actions are a
+tagged union"). For each contract, **cite the ADR that is its source of truth** rather than
+re-describing the decision; then add only what the architecture doesn't already say: the
+**introducing feature** (which feature lands its minimum-viable form) and the **extending features**
+(which features add to it). If a contract has *no* ADR behind it, that's a signal — either it's a
+real architectural decision the architecture missed (surface it; it may warrant an ADR) or it's an
+incidental shared shape that just needs naming here.
 
 A multi-feature roadmap with zero cross-cutting contracts is a planning error — the features have
-implicit contracts and parallel work will diverge. These contracts are exactly what
-`kmaz-plan-iteration` freezes before fan-out, so name them precisely.
+implicit contracts and concurrent work will diverge. These contracts are exactly what
+`kmaz-plan-iteration` freezes (with concrete signatures) before the build, and it freezes them
+*consistent with the cited ADRs* — so name each one precisely and point it at its ADR.
 
 ## Output layout (iterations top-level, features nested)
 
@@ -125,7 +133,7 @@ docs/
   ROADMAP.md                       # the master artifact
   iterations/
     01-<iteration-slug>/
-      README.md                    # iteration overview (goal, feature list, contracts, DAG, parallelism)
+      README.md                    # iteration overview (goal, feature list, contracts, dependency edges)
       01-<feature-slug>.md         # nested feature spec
       02-<feature-slug>.md
       ...
@@ -160,44 +168,40 @@ UI — resist splitting into prerequisite setup features); each later feature ex
 (a11y audit, observability, design refinement) is usually its own feature near an iteration's end.
 **Bias toward fewer, fatter, more vertical features** — coordination cost is real.
 
-### Step 3 — Identify cross-cutting contracts
+### Step 3 — Identify cross-cutting contracts (index to ADRs)
 
 Walk the candidate list. For each pair of features sharing state, types, schemas, or visual
-conventions, name the contract that binds them: source-of-truth file, introducing feature,
-consuming/extending features, change protocol. This becomes the ROADMAP contracts table and feeds
-`kmaz-plan-iteration`'s contract-freezing step directly.
+conventions, name the contract that binds them, and **cite the ADR that decided it** (source of
+truth), plus the introducing feature and the extending features. Don't re-derive the decision from
+the specs — the architecture already made it; you're building the index the planner freezes against.
+This becomes the ROADMAP contracts table and feeds `kmaz-plan-iteration`'s contract-freezing step
+directly.
 
-### Step 4 — Group features into iterations; build the iteration DAG
+### Step 4 — Group features into iterations
 
 An **iteration** is a shippable milestone with a one-sentence goal: *"After this iteration, a user
-can do X."* Group features so: each iteration's goal is achievable by completing its features; its
-features parallelize where they don't conflict; iterations form a DAG (a genuine cross-iteration
-feature dependency is a hard ordering, else iterations may run concurrently).
+can do X."* Group features so each iteration's goal is achievable by completing its features, and so
+each iteration leaves the system more capable *and still shippable*. A genuine cross-iteration hard
+dependency (one iteration consumes another's not-yet-shipped behavior) forces ordering; otherwise the
+ordering is just the arc you choose.
 
-For a typical 4–6 week project expect **3–6 iterations**, 2–5 features each, with 1–3 iterations in
-flight at peak. The iteration DAG is **the central artifact** of ROADMAP.md.
+For a typical 4–6 week project expect **3–6 iterations**, 2–5 features each.
 
-### Step 5 — Map parallelism at all three levels
+### Step 5 — Record the hard-dependency edges
 
-Per iteration: which other iterations run concurrently, against which contracts, with what
-convergence rework; which features run as concurrent PRs vs. serialize, and where they converge;
-and per feature, 1–5 sub-tasks marked `[parallel]` or `[serial after X]`. The output is the
-**parallelism map** — a per-iteration DAG plus the global iteration DAG.
+Per feature, record `dependsOn`: the feature ids whose *not-yet-shipped behavior* it consumes (see
+"Dependencies, not lanes"). This is the only ordering signal the build stages use, so keep it minimal
+and honest — omit contract-mediated soft deps (they build against the frozen contract). Do NOT model
+which features run "in parallel", a critical path, or convergence rework: the build derives all of
+that from these edges. You're declaring the graph, not scheduling it.
 
-### Step 6 — Identify the critical path
-
-The critical path is the **longest serial chain of features** across the whole roadmap that genuinely
-cannot be parallelized regardless of staffing — the residue after all contract-locking
-parallelizations are exploited, *not* the longest dependency chain. State it as a one-line feature
-sequence; call out where bottleneck risk concentrates (usually the convergence points).
-
-### Step 7 — Surface ambiguities to the user; get answers
+### Step 6 — Surface ambiguities to the user; get answers
 
 Before writing files, surface genuine ambiguities the architecture/PRD don't pin down (decision-
 relevant only). Common areas: whether two capabilities are one feature or two; whether infra folds
 into a vertical slice or warrants an infra-only feature; sequencing intent if a demo/deadline is
-implied; which iterations the user wants concurrent vs. serial; the shape of the highest-risk
-unknowns (early iterations should de-risk those).
+implied; the shape of the highest-risk unknowns (early iterations should de-risk those). Keep these
+about *what to build and in what order* — not about how much parallelizes, which is the build's call.
 
 ### Step 8 — Write `docs/ROADMAP.md`
 
@@ -211,36 +215,23 @@ unknowns (early iterations should de-risk those).
 2–4 sentences: what we're building, the iteration arc in one line, team-shape assumptions, ship target.
 
 ## The iteration arc
-The ordered (or DAG-ordered) iterations. For each:
+The ordered iterations. For each:
 - **Iteration N: <name>** — what the user can do after this iteration they could not before (one sentence).
 - Link to its directory: [docs/iterations/NN-<slug>/](./iterations/NN-<slug>/).
-- Whether it can run concurrently with any other iteration.
 This is the executive summary — a reader of only this section understands the shipping arc.
 
-## Iteration DAG
-A mermaid graph: iterations as nodes, dependencies as edges. Mark hard dependencies (must serialize)
-vs. soft (contract-mediated; can parallelize against a locked contract).
-
 ## Features index
-| ID | Feature | Iteration | Spec | "Before → After" (one line) | Depends on | Unblocks | Parallel with |
-|----|---------|-----------|------|------------------------------|-----------|----------|---------------|
-(Spec column links the nested path, e.g. `iterations/01-skeleton/02-foo.md`.)
+| ID | Feature | Iteration | Spec | "Before → After" (one line) | Depends on (hard) |
+|----|---------|-----------|------|------------------------------|--------------------|
+(Spec column links the nested path, e.g. `iterations/01-skeleton/02-foo.md`. "Depends on" lists ONLY
+hard deps — features whose not-yet-shipped behavior this one consumes; blank = nothing, builds as
+soon as contracts are frozen.)
 
 ## Cross-cutting contracts
-| Contract | Source of truth | Introduced by | Extended by | Change protocol | Convergence risks |
-|----------|-----------------|---------------|-------------|-----------------|---------------------|
-Mark convergence points (two parallel features both modifying a contract) with ⚠ + the expected rework.
-
-## Parallelism map (per iteration)
-For each iteration: a small feature DAG + a paragraph naming which features run concurrently, where
-convergence happens within the iteration, and the expected rework + who absorbs it.
-
-## Critical path
-One sentence: the longest serial chain of features. A short paragraph on where rework risk concentrates.
-
-## Cross-iteration concurrency
-Which iterations can be in flight together, against which contracts, and the expected merge load when
-they converge.
+| Contract | Source of truth (ADR) | Introduced by | Extended by |
+|----------|------------------------|---------------|-------------|
+Cite the ADR that decided each contract as its source of truth; don't restate the decision. These are
+what `kmaz-plan-iteration` freezes with concrete signatures before the build.
 
 ## Risk-weighted ordering
 The biggest unknowns and which iteration de-risks each. Surprises late cost more than surprises early.
@@ -265,20 +256,14 @@ For each iteration, create `docs/iterations/NN-<slug>/`.
 **Status:** Not started · **Roadmap:** [../../ROADMAP.md](../../ROADMAP.md)
 
 ## Features in this iteration
-| ID | Feature | Spec | One-line before → after | Parallel with | Depends on |
-|----|---------|------|--------------------------|---------------|-----------|
-(Spec links the sibling file, e.g. `01-foo.md`.)
+| ID | Feature | Spec | One-line before → after | Depends on (hard) |
+|----|---------|------|--------------------------|--------------------|
+(Spec links the sibling file, e.g. `01-foo.md`. "Depends on" = hard deps only; blank = none.)
 
 ## Shared contracts this iteration touches
-The cross-cutting contracts introduced/extended here, each with its source of truth and which
-features introduce vs. extend it. (This is what kmaz-plan-iteration freezes before fan-out.)
-
-## Parallelism within the iteration
-Which features fan out concurrently, which serialize behind a hard dep, and where they converge +
-the expected rework.
-
-## Concurrency with other iterations
-Which other iterations can be in flight at the same time, against which locked contracts.
+The cross-cutting contracts introduced/extended here, each citing the ADR that decided it and which
+features introduce vs. extend it. (This is what kmaz-plan-iteration freezes with signatures before
+the build.)
 
 ## Definition of done for the iteration
 The iteration ships when all its feature specs are done AND <the iteration goal> is observably true.
@@ -298,28 +283,26 @@ This framing is the discipline check. If you can't fill it with a real user-obse
 the feature is mis-scoped.
 
 ## How it fits the roadmap
-Its iteration. On the critical path or off. Which features it may run concurrently with. The
-convergence point if any.
+Its iteration, and its hard dependencies (the features whose shipped behavior it consumes) — or
+"none, builds as soon as contracts are frozen".
 
 ## Requirements traced (from the PRD)
 Which PRD requirement(s)/acceptance-criteria numbers this feature satisfies. (Keeps WHAT → build honest.)
 
 ## Dependencies (must exist before this starts)
-- <F-XX Feature> — what specifically is needed (a contract, shipped behavior, a deployed surface).
+- <F-XX Feature> — a HARD dep: what shipped behavior of it this consumes. (A contract-mediated
+  shared shape is NOT a hard dep — list it under "Contracts touched" instead, it builds against the
+  frozen contract.)
 - External: <accounts/services to provision first>.
-(If none: "None — can start immediately.")
+(If none: "None — can start as soon as the iteration's contracts are frozen.")
 
 ## Unblocks (what waits on this)
 - <F-YY Feature> — what they consume from this.
 
 ## Contracts touched
-- <Contract name> (source of truth: <doc/file>) — what this introduces/consumes/extends. Flag
-  explicitly if a parallel feature also extends it — name the feature and the expected rework.
-
-## Sub-tasks
-1–5 sub-tasks. For each: a one-line description; a `[parallel]` or `[serial after X]` annotation;
-the convergence note (how they merge into the feature's single PR).
-(For very small features: "Sub-tasks: none — single workstream.")
+- <Contract name> (source of truth: <ADR-NNN>) — what this introduces/consumes/extends. If another
+  feature also extends it, name the feature (the planner reconciles both extensions when it freezes
+  the contract).
 
 ## Acceptance criteria (product behavior)
 Verifiable outcomes defining "done" in terms of what a user/caller can observe — not unit-test
@@ -336,11 +319,6 @@ environment (real device, deployed URL). Specify coverage of behavior, not speci
 Anything a human must do an agent cannot: keys/secrets, external provisioning, paid accounts,
 on-device testing, asset generation needing human review. (If none: "None.")
 
-## Convergence and expected rework
-If this ships concurrently with features touching the same contract/code path, name them and the
-expected rework, who absorbs it, what test catches the merge bug. (If purely serial / no
-convergence: "None expected.")
-
 ## Implementation notes (filled in by the building agent)
 > Owned by the builder, not the planner. Starts empty. The agent records implementation decisions
 > and rationale here as it builds; kmaz-plan-iteration appends the approved build plan here, and
@@ -350,7 +328,7 @@ convergence: "None expected.")
 
 Leave "Implementation notes" genuinely empty — it is the build stages' space.
 
-### Step 10 — Verify the plan is coherent
+### Step 9 — Verify the plan is coherent
 
 Each check exists because skipping it has historically produced a bad plan:
 
@@ -358,16 +336,15 @@ Each check exists because skipping it has historically produced a bad plan:
   "a package exists" / "a schema is defined".
 - **Requirement traceability:** every feature traces to PRD requirement(s); no PRD requirement in
   scope is left uncovered by some feature.
-- **Sub-task parallelism is marked, not assumed.**
+- **Hard deps are real and minimal:** every `dependsOn` edge is a genuine consume-unshipped-behavior
+  dependency, not a contract-mediated soft dep dressed up as one. A spurious edge needlessly
+  serializes the build.
+- **The dependency graph is acyclic** (no cycles; mutual dependence between two features means a
+  shared contract should be extracted so both build against it instead).
 - **Iteration shippability:** each iteration's features, when merged, leave the system more capable
   *and still shippable*. If iteration N needs iteration M half-done, they're mis-grouped.
-- **Cross-cutting contracts documented in one place** with named introducer + consumers; convergence
-  points explicit.
-- **The iteration DAG is a DAG** (no cycles; mutual-dependence means a shared contract should be
-  extracted earlier).
-- **Iteration concurrency is named** — for every concurrent pair, the locked contracts that make it
-  safe and the expected merge rework.
-- **The critical path is realistic** (the serial residue, not the longest chain).
+- **Cross-cutting contracts each cite an ADR** (or are flagged as a gap the architecture missed),
+  with named introducer + extenders.
 - **No "build the infrastructure" features** — infra folds into the first slice that needs it,
   except infra-only features with a smoke-testable observable surface.
 - **Acceptance criteria are product behavior**, not unit acceptance.
@@ -375,27 +352,40 @@ Each check exists because skipping it has historically produced a bad plan:
 - **Layout is correct:** every iteration is a `docs/iterations/NN-<slug>/` dir with a README and its
   nested feature specs; every ROADMAP/README link resolves; feature IDs are globally unique.
 
-Then summarize for the user: number of iterations + features, the critical path in one sentence,
-what can start in parallel immediately, which iterations are designed to run concurrently, open
-decisions. Point them at the next stage: run **`kmaz-plan-iteration`** on the first iteration's
-directory (`docs/iterations/01-<slug>/`) to plan its features for parallel build, then
-`kmaz-build-iteration` to build them.
+Then summarize for the user: number of iterations + features, the longest hard-dependency chain in
+one sentence (the genuinely-serial spine), open decisions. Point them at the next stage (see "Handing
+off").
+
+### Step 10 — Hand off (and optionally plan the first iteration inline)
+
+The next stage plans one iteration's features for build. Tell the user they can run
+**`kmaz-plan-iteration`** pointed at the first iteration directory
+(`docs/iterations/01-<slug>/`), then `kmaz-build-iteration` once they approve the plan.
+
+**Offer to run the first plan inline.** Planning the first iteration is the natural continuation of
+this session and needs no new human input until its approval gate — so offer to kick it off now
+rather than making the user run a separate command. If they accept and your harness exposes the
+`workflow()` hook, invoke the saved **`kmaz-plan-iteration`** workflow with the first iteration's
+directory; it produces the reviewable BUILD-PLAN for that iteration and STOPS at the approval gate
+(it writes the plan with Status "Awaiting approval" and does not build). You then present that plan
+for approval exactly as the plan stage prescribes — the human's review gate is preserved; only the
+extra command invocation is removed. If the hook isn't available, just tell them the exact command to
+run. Do NOT chain past the approval gate, and do NOT auto-run the build — those stay user-triggered.
 
 ## Notes on judgment
 
 - **Favor fewer, fatter features.** An iteration of 3 fat features usually ships faster than 8 thin
-  ones — 8 generate more convergence rework than they save on parallel staffing.
-- **Cross-cutting contracts are first-class.** They're how parallel work coordinates; locking a
-  contract early lets parallel features build against a stable shape. Name them precisely — the next
-  stage freezes them.
-- **Rework at convergence is expected, not a failure.** Plan it, name it, allocate ownership. The
-  failure mode is *surprise* rework from an unnamed contract.
-- **Iteration concurrency is the highest-leverage parallelism** — it's what lets a small team ship
-  like a big one. Design for it deliberately.
-- **The critical path determines the ship date; everything else determines team size.**
+  ones — coordination and integration cost is real.
+- **Cross-cutting contracts are first-class, and they're decided in ADRs.** Index them here pointing
+  at their ADR; the planner freezes them with signatures so features build against a stable shape.
+  Name them precisely — an unnamed shared shape is how concurrent work diverges.
+- **Declare dependencies; don't schedule parallelism.** The build derives all concurrency from the
+  dependency graph. Your leverage is honest, minimal hard-dep edges + early-frozen contracts — not
+  predicting how much runs at once.
 - **The first feature is always the thinnest possible vertical slice through every layer.** Setup
   belongs inside it; no separate "scaffolding" features.
 - **Never invent architecture.** If the design is silent on something that blocks decomposition,
-  surface it as a Step-7 question, not a buried assumption.
-- **The roadmap is a living artifact.** Iteration N+1's detailed plan is reconsidered in light of
-  what iteration N discovered; update the roadmap as the project learns.
+  surface it as a Step-6 question, not a buried assumption.
+- **The roadmap is a living artifact, and the build feeds it back.** `kmaz-build-iteration` amends
+  each feature's outcome into its spec and propagates durable lessons to ROADMAP/ADRs; reconsider
+  iteration N+1's grouping in light of what iteration N discovered.
