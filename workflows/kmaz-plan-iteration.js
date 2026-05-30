@@ -16,9 +16,12 @@ export const meta = {
 // kmaz-plan-iteration — phase 1 of the two-phase feature build.
 //
 // Shared pipeline conventions (model tiering, dependency-only concurrency,
-// contract discipline, the compound loop) live in
-// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md — the canonical source; the notes
-// below are this workflow's specifics.
+// contract discipline, the compound loop) are canonical in
+// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md. A workflow can't read that file at
+// runtime, so every agent() prompt below EMBEDS the rules its sub-agent needs
+// inline. MAINTAINER RULE: changing a shared rule means updating CONVENTIONS.md
+// AND the prompts here that embed it. The notes below are this workflow's
+// specifics.
 //
 // WHY two phases: a workflow can't take mid-run user input, but the build needs
 // a human plan-approval gate. So planning and building are separate workflows:

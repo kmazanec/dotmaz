@@ -2,10 +2,30 @@
 
 The single source of truth for the rules every kmaz pipeline stage shares. This is a
 **reference, not a triggerable skill** — it has no `description` frontmatter and is never
-invoked directly. Each stage cites it instead of restating its rules, so a rule is changed
-in ONE place and the whole pipeline inherits the change. When a stage's own instructions
-genuinely conflict with this doc, the stage wins for that stage — but prefer fixing the
-conflict here so it doesn't drift.
+invoked directly. When a stage's own instructions genuinely conflict with this doc, the stage
+wins for that stage — but prefer fixing the conflict here so it doesn't drift.
+
+## How this doc is loaded (read this first)
+
+Nothing loads this file automatically. It reaches the two kinds of actor differently — know which
+you are:
+
+- **Skills (an orchestrator runs them in-conversation).** The orchestrator is a reasoning model. Each
+  SKILL.md's first step is "read this file." Having read it, the orchestrator **selects the relevant
+  rules at runtime and copies them into each sub-agent it dispatches** — a security reviewer gets the
+  security + timeless-comment rules, a doc writer gets none of the code rules. Inject what's relevant
+  to that sub-agent's task; don't dump the whole doc.
+- **Workflows (`.js` files; `agent()` spawns sub-agents).** A workflow is deterministic code, not a
+  reasoner — it cannot read this file at runtime and cannot decide what's relevant. So every workflow
+  sub-agent prompt **embeds the rules it needs inline** (the prompt string is the only context the
+  sub-agent gets). Those inline copies are the enforceable form; THIS doc is the canonical text they
+  are kept in sync with. **Maintainer rule:** when you change a shared rule here, update the workflow
+  prompts that embed it too — the spine alone changes nothing at workflow runtime.
+
+So: this doc's value is (1) one place to edit a rule, (2) what skill orchestrators load and
+selectively inject, and (3) the canonical source workflow prompts are copied from. It is not an
+auto-loaded runtime context — enforcement always happens where a rule is *also* present in the
+SKILL step or the agent prompt that runs.
 
 ## The pipeline
 

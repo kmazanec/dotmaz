@@ -16,8 +16,10 @@ export const meta = {
 // kmaz-research — the shared, reusable research fan-out for the kmaz pipeline.
 //
 // Shared pipeline conventions (model tiering, the fan-out + adversarial-verify
-// shape, the teach-the-human mandate this grounds) live in
-// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md.
+// shape, the teach-the-human mandate this grounds) are canonical in
+// dotmaz/skills/kmaz-pipeline/CONVENTIONS.md. This workflow can't read that file
+// at runtime, so each agent() prompt embeds the rules it needs inline.
+// MAINTAINER RULE: a shared-rule change updates the spine AND these prompts.
 //
 // WHY a workflow: research is the canonical fan-out + adversarial-verify shape
 // workflows exist for. Independent investigators cover different angles in

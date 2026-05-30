@@ -15,9 +15,11 @@ description: >-
 
 # Merge and Cleanup
 
-> **Pipeline conventions:** shared rules (worktree isolation, linear history, the hard git rules)
-> live in [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill is the
-> closer; it follows those and adds the conservative landing process below.
+> **Pipeline conventions — READ FIRST:** before any git mutation, read
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md) in full — it holds the shared
+> rules (worktree isolation, linear history, the hard git rules). If you dispatch any sub-agent, copy
+> in only the rules relevant to its task. This skill is the closer; it adds the conservative landing
+> process below.
 
 ## What this is for
 

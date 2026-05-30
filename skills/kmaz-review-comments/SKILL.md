@@ -9,9 +9,11 @@ description: >-
 
 # Review Comments → Fixes + Durable Lessons
 
-> **Pipeline conventions:** the compound learning loop (propagating durable lessons upstream) and
-> other shared rules live in [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md).
-> This skill is where review feedback enters that loop.
+> **Pipeline conventions — READ FIRST:** before working the comments, read
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md) in full — it holds the compound
+> learning loop (propagating durable lessons upstream) and the other shared rules. If you dispatch any
+> sub-agent, copy in only the rules relevant to its task. This skill is where review feedback enters
+> that loop.
 
 ## What this is for
 

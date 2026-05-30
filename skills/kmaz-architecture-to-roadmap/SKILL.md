@@ -16,10 +16,12 @@ description: >-
 
 # Architecture → Iterative Roadmap (iterations as the top-level unit)
 
-> **Pipeline conventions:** shared rules (dependency-only concurrency, contract discipline, the
-> compound loop, model tiering, the artifact map) live in
-> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill declares the
-> dependency graph + the contracts index the plan/build stages schedule and freeze against.
+> **Pipeline conventions — READ FIRST:** before doing anything, read
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md) in full — it holds the shared
+> rules (dependency-only concurrency, contract discipline, the compound loop, model tiering, the
+> artifact map). If you dispatch any sub-agent, copy in only the rules relevant to its task. This
+> skill declares the dependency graph + the contracts index the plan/build stages schedule and freeze
+> against.
 
 ## Purpose & philosophy
 

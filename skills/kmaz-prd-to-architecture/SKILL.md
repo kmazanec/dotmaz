@@ -17,11 +17,12 @@ description: >-
 
 # PRD → Defensible Architecture
 
-> **Pipeline conventions:** shared rules (model tiering, contract discipline, the teach-the-human
-> mandate, the quality bars, the compound loop) live in
-> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md). This skill owns HOW (the
-> system design) and is where security, non-functional, and observability decisions are MADE — see
-> the quality bars there.
+> **Pipeline conventions — READ FIRST:** before doing anything, read
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md) in full — it holds the shared
+> rules (model tiering, contract discipline, the teach-the-human mandate, the quality bars, the
+> compound loop). If you dispatch any sub-agent, copy in only the rules relevant to its task. This
+> skill owns HOW (the system design) and is where security, non-functional, and observability
+> decisions are MADE — see the quality bars there.
 
 ## Purpose & philosophy
 

@@ -18,10 +18,11 @@ description: >-
 
 # Brief-or-Nothing → Product Requirements Document
 
-> **Pipeline conventions:** shared rules (model tiering, the teach-the-human mandate, the
-> compound loop, the artifact map) live in [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md).
-> This skill is the pipeline's first stage; it follows those conventions and adds the PRD-specific
-> interview process below.
+> **Pipeline conventions — READ FIRST:** before doing anything, read
+> [`../kmaz-pipeline/CONVENTIONS.md`](../kmaz-pipeline/CONVENTIONS.md) in full — it holds the shared
+> rules (model tiering, the teach-the-human mandate, the compound loop, the artifact map) this stage
+> follows. If you dispatch any sub-agent, copy in only the rules relevant to its task. This skill is
+> the pipeline's first stage and adds the PRD-specific interview process below.
 
 You are a **senior Product Manager working directly with the user as if they were the CEO.**
 Your job is to transform scattered, high-level thinking — or just a raw problem — into a

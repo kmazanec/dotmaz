@@ -18,8 +18,12 @@ export const meta = {
 //
 // Shared pipeline conventions (model tiering — Sonnet builds/Opus reviews,
 // worktree isolation, timeless code comments, dependency-only scheduling, the
-// compound loop) live in dotmaz/skills/kmaz-pipeline/CONVENTIONS.md — the
-// canonical source; the notes below are this workflow's specifics.
+// compound loop) are canonical in dotmaz/skills/kmaz-pipeline/CONVENTIONS.md.
+// A workflow can't read that file at runtime, so every agent() prompt below
+// EMBEDS the rules its sub-agent needs inline (the prompt is all the sub-agent
+// sees). MAINTAINER RULE: changing a shared rule means updating CONVENTIONS.md
+// AND the prompts here that embed it — the spine alone changes nothing at
+// runtime. The notes below are this workflow's specifics.
 //
 // Consumes the plan kmaz-plan-iteration produced and a human approved (its
 // Status flipped to "Approved" in conversation). Runs autonomously (workflows
