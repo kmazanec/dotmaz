@@ -1,29 +1,33 @@
 export const meta = {
   name: 'kmaz-build-iteration',
   description:
-    'Build an approved iteration: implement + commit the frozen shared contracts first, then build each feature in its own worktree (independent features concurrently, hard-dependent ones after their deps) — Sonnet builds test-first to the spec checklist running only the impacted tests, drives the running app for QA evidence, then ONE opus reviewer covers all six dimensions (spec/security/robustness/efficiency/convention/contrarian) and delegates each confirmed gating fix to a Sonnet fixer, with a conditional skeptic re-checking only high-severity security/spec. Returns a convergence report for the human to land as one MR.',
+    'Build an approved iteration: implement + commit the frozen shared contracts first, then build each feature in its own worktree (independent features concurrently, hard-dependent ones after their deps) — Sonnet builds test-first to the spec checklist running only the impacted tests, drives the running app for QA evidence, then ONE opus reviewer covers all six dimensions (spec/security/robustness/efficiency/convention/contrarian) and delegates each confirmed gating fix to a Sonnet fixer, with a conditional skeptic re-checking only high-severity security/spec. Assembles the shippable features onto one linear integration branch, runs the full suite once, opens ONE MR, and amends each feature\'s outcome into its spec.',
   whenToUse:
-    'Run AFTER kmaz-plan-iteration and AFTER a human approves the iteration\'s BUILD-PLAN-<slug>.md + the per-spec "Build plan (approved)" sections. Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/, report CONVERGENCE-<slug>.md), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — the primary worktree (where the human works on main) is never touched. Finalizes autonomously: assembles the shippable features onto ONE linear integration branch (cherry-pick, no merge commits), runs the FULL test suite once at the end, pushes it, opens ONE MR (does not merge it), and tears down the transient per-feature worktrees/branches once the MR is open. Blocked features are left out with their worktrees preserved.',
+    'Run AFTER kmaz-plan-iteration and AFTER the iteration\'s BUILD-PLAN-<slug>.md Status is "Approved" (the assistant flips it on the human\'s verbal approval). Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — the primary worktree (where the human works on main) is never touched. Finalizes autonomously: assembles the shippable features onto ONE linear integration branch (cherry-pick, no merge commits), runs the FULL test suite once at the end, amends each feature\'s build outcome into its spec, pushes the branch, opens ONE MR (does not merge it), returns the MR URL to the user (never written to a file), and deterministically tears down the transient per-feature worktrees/branches once the MR is open. Blocked features are left out with their worktrees preserved.',
   phases: [
     { title: 'Load', detail: 'resolve the approved plan unambiguously by slug + per-feature plans; sanity-check it is approved' },
     { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any feature work', model: 'opus' },
     { title: 'Build', detail: 'per feature, in its own worktree: Sonnet TDDs each chunk to green running ONLY impacted tests, drives the running app for QA evidence' },
     { title: 'Review', detail: 'per feature: ONE opus reviewer covers all 6 dimensions, a Sonnet fixer applies confirmed gating fixes; conditional skeptic on high-sev sec/spec', model: 'opus' },
-    { title: 'Converge', detail: 'full integrated suite + end-to-end smoke on the assembled batch; emit the convergence report' },
+    { title: 'Converge', detail: 'full integrated suite + e2e smoke on the assembled batch; amend outcomes into specs, open ONE MR, deterministic teardown' },
   ],
 }
 
 // ---------------------------------------------------------------------------
 // kmaz-build-iteration — phase 2 of the two-phase feature build.
 //
-// Consumes the plan kmaz-plan-iteration produced and a human approved. Runs
-// autonomously (workflows take no mid-run input). The human gate already
-// happened — approving the plan — so finalization is autonomous too: the
-// workflow assembles the shippable features onto ONE linear integration branch
-// (cherry-pick, zero merge commits), pushes it, opens ONE MR, and tears down the
-// transient per-feature worktrees/branches once the MR is open and verified to
-// contain the work. It does NOT merge the MR (the human does) and does NOT wait
-// for permission to push. Blocked features are left out, worktrees preserved.
+// Consumes the plan kmaz-plan-iteration produced and a human approved (its
+// Status flipped to "Approved" in conversation). Runs autonomously (workflows
+// take no mid-run input). The human gate already happened — approving the plan —
+// so finalization is autonomous too: the workflow assembles the shippable
+// features onto ONE linear integration branch (cherry-pick, zero merge commits),
+// runs the full suite once, amends each feature's outcome into its spec, pushes,
+// and opens ONE MR. It returns the MR URL to the USER (never writes it to a file
+// — that forces another commit/push and the back-link rots). It does NOT merge
+// the MR (the human does) and does NOT wait for permission to push. A
+// DETERMINISTIC post-step (not the converge agent's checklist) tears down the
+// transient per-feature worktrees/branches once the MR is open and the commits
+// are verified present. Blocked features are left out, worktrees preserved.
 //
 // MODEL TIERS: Sonnet builds, Opus reviews. The approved per-spec plans are
 // detailed enough that Sonnet implements every feature — even high-stakes work —
@@ -44,9 +48,9 @@ export const meta = {
 // worktree) that every feature worktree forks from.
 //
 // PARALLEL ITERATIONS: every artifact is slug-scoped — build/<slug>, worktrees
-// under .claude/worktrees/<slug>/, integration/<slug>, docs/CONVERGENCE-<slug>.md.
-// Two iterations build concurrently without colliding on a branch, a worktree
-// path, or the report file. Don't reintroduce an unscoped shared name.
+// under .claude/worktrees/<slug>/, integration/<slug>. Two iterations build
+// concurrently without colliding on a branch or a worktree path. Don't
+// reintroduce an unscoped shared name.
 //
 // The plan file (BUILD-PLAN-<slug>.md) carries each feature's specPath, so this
 // workflow is layout-agnostic — it reads whatever paths the plan names.
@@ -242,8 +246,32 @@ const BATCH_VERDICT_SCHEMA = {
 
 // reviewFeature returns a plain JS object (build + confirmed findings + fix
 // summary + unresolvedGating). The converge agent folds these into the
-// per-feature shippable/blocked verdict + retro AND the batch report in one
-// pass — there is NO separate per-feature verdict agent.
+// per-feature shippable/blocked verdict + retro in one pass — there is NO
+// separate per-feature verdict agent and NO separate convergence-report file
+// (each feature's outcome is amended into its own spec instead).
+
+// The converge agent assembles + pushes + opens the MR, then reports back the
+// MR URL and EXACTLY which feature ids landed on the integration branch — that
+// `shipped` list keys the deterministic teardown post-step (so cleanup doesn't
+// depend on the agent finishing a checklist). The MR URL is returned to the
+// user, never written to a file.
+const CONVERGE_SCHEMA = {
+  type: 'object',
+  required: ['integrationBranch', 'mrOpened', 'shipped'],
+  properties: {
+    integrationBranch: { type: 'string' },
+    suiteGreen: { type: 'boolean', description: 'true only if the FULL integrated suite ended green on the assembled branch' },
+    suiteEvidence: { type: 'string', description: 'quoted suite result line' },
+    smokeEvidence: { type: 'string', description: 'quoted end-to-end smoke evidence, or "skipped"' },
+    linearHistoryProof: { type: 'string', description: 'the (empty) output of `git log --merges` proving zero merge commits' },
+    mrOpened: { type: 'boolean', description: 'true if the MR/PR is open' },
+    mrUrl: { type: 'string', description: 'the open MR/PR URL — returned to the user, NEVER written into any tracked file' },
+    pushError: { type: 'string', description: 'the exact error if push/MR-open failed (else empty); when set, mrOpened=false and teardown is skipped so the human can finish' },
+    shipped: { type: 'array', items: { type: 'string' }, description: 'feature ids whose commits you VERIFIED are present on the integration branch — these are safe to tear down' },
+    leftOut: { type: 'array', items: { type: 'string' }, description: 'feature ids left out (blocked or conflicting) — their worktrees/branches MUST be preserved' },
+    summary: { type: 'string', description: 'short human-facing summary of decisions + manual-review hotspots (mirrors the MR body)' },
+  },
+}
 
 // === Phase 1: Load =========================================================
 
@@ -521,13 +549,15 @@ const featureResults = (await Promise.all(manifest.features.map((f) => runFeatur
 // Assembles the shippable feature branches onto ONE integration branch by
 // CHERRY-PICK/REBASE ONLY (zero merge commits — linear history is mandatory,
 // verified with `git log --merges`). This is the ONE place the FULL test suite
-// runs (the build + fix steps ran only impacted tests, to stay fast/cheap) —
-// plus an end-to-end smoke. Then it writes the convergence report, AUTONOMOUSLY
-// pushes the branch and opens ONE MR (does NOT merge it — the human does that),
-// and tears down the transient per-feature worktrees/branches once the MR is
-// open and verified to contain the work. Blocked features are left out, their
-// worktrees preserved. Autonomous finalization is correct here: the human's gate
-// was approving the plan; waiting again to push/open the MR is the bug this fixes.
+// runs (the build + fix steps ran only impacted tests, to stay fast/cheap) plus
+// an end-to-end smoke. Each feature's outcome is amended into ITS OWN SPEC (no
+// separate convergence-report file); durable lessons still propagate to ADR/
+// ROADMAP/CLAUDE.md. Then it pushes the branch and opens ONE MR (does NOT merge
+// it — the human does), reporting the MR URL back to the USER only (never into a
+// tracked file — that would force another commit/push and rot). Teardown is a
+// DETERMINISTIC post-step below, not part of this agent's checklist, so it isn't
+// at the mercy of the agent finishing. Autonomous finalization is correct here:
+// the human's gate was approving the plan; re-gating the push is the bug it fixes.
 
 phase('Converge')
 
@@ -541,23 +571,59 @@ const shippable = featureResults.filter(isShippable)
 const blocked = featureResults.filter((r) => !isShippable(r))
 
 const convergence = await agent(
-  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each SHIPPABLE feature built on its own \`feat/<id>\` branch off that. You finalize AUTONOMOUSLY — assemble, push, open ONE MR, and clean up the scaffolding. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). The only thing that stops you is a real cherry-pick conflict needing human judgment.
+  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each SHIPPABLE feature built on its own \`feat/<id>\` branch off that. You finalize AUTONOMOUSLY — assemble, amend outcomes, push, open ONE MR. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). You do NOT tear down worktrees — a deterministic post-step does that from the \`shipped\` list you return. The only thing that stops you is a real cherry-pick conflict needing human judgment.
 
 1. ASSEMBLE the SHIPPABLE feature branches (below) onto an iteration-scoped integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration never collides). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Ship SHIPPABLE features only; leave any blocked feature OUT (its branch/worktree stays untouched for the human).
-   LINEAR HISTORY IS MANDATORY — ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature's commits in DAG order (\`git cherry-pick\`), or \`git rebase --onto\`. NEVER \`git merge\` (and never \`cherry-pick -m\`) — a merge commit is a failure. Resolve predicted convergence in place as ordinary commits. If a real conflict needs human judgment, leave that feature OUT (treat it as blocked) and report it — don't force it. VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing (redo any pick that created a merge commit); quote the empty result as proof.
+   LINEAR HISTORY IS MANDATORY — ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature's commits in dependency order (\`git cherry-pick\`), or \`git rebase --onto\`. NEVER \`git merge\` (and never \`cherry-pick -m\`) — a merge commit is a failure. Resolve predicted convergence in place as ordinary commits. If a real conflict needs human judgment, leave that feature OUT (treat it as blocked) and report it in \`leftOut\` — don't force it. VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing; quote the empty result in \`linearHistoryProof\`.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch — this is the ONE full-suite run (the per-feature build + fix steps ran only impacted tests). Fix any failures here: a failure now is an integration break the scoped runs couldn't see. The suite MUST end green before you push.
-3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence.`}
-4. Per feature, FINALIZE the verdict from its review outcome below: confirm shippable (every acceptance criterion met, no unresolved high/medium security or contract drift, suite green, smoke passed or honestly deferred), list unresolved gating findings, list deferred low findings, and write a tight retro — propagate any durable lesson to ARCHITECTURE/ROADMAP/an ADR/CLAUDE.md now (commit it on the integration branch), else "nothing material".
-5. Write the CONVERGENCE REPORT to \`docs/CONVERGENCE-${ITERATION_SLUG}.md\` (commit it on the integration branch) AND return it as your text. Per feature: branch, shippable y/n, acceptance status, unresolved gating, deferred low findings, QA evidence, retro propagated. Batch-level: integrated suite result (quoted), smoke evidence, proof of linear history (empty \`git log --merges\`), convergence conflicts + how resolved, and the list of features left out (blocked) with why.
-6. PUSH + OPEN THE MR autonomously — do NOT wait for the human, do NOT ask permission (the human delegated finalization by running this build). \`git push -u origin integration/${ITERATION_SLUG}\`, then open ONE MR/PR against the repo's default branch using the project's forge (\`glab mr create\` / \`gh pr create\`; discover which from the remote). MR body = the convergence report's decisions + load-bearing areas to review manually (contract changes, trust boundaries) + deferred/blocked items. Do NOT merge it. If push or MR-open genuinely fails (no remote, auth), report the exact error + the local branch name so the human can finish — that is the ONLY case where you stop short of an open MR.
-7. TEAR DOWN the transient scaffolding — but ONLY after the MR is open AND you have verified each shipped feature's commits are present on \`integration/${ITERATION_SLUG}\` (\`git log\` / \`git cherry\` check; quote the confirmation). Then for each SHIPPED feature: \`git worktree remove ${WORKTREE_DIR}/<id>\` and \`git branch -D feat/<id>\`. Also remove the contract-barrier worktree \`${WORKTREE_DIR}/contracts\` (its commits are on ${buildBranch}, which integration was cut from). KEEP: the integration worktree/branch (it holds the pushed branch), \`${buildBranch}\`, and every BLOCKED feature's worktree + branch (un-collected work — never delete it). Report exactly what you removed and what you kept.
+3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`}
+4. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC (there is NO separate convergence-report file). For each feature, append a short "### Build outcome" note under its "## Build plan (approved)" section in its spec file: shippable y/n, acceptance status, any unresolved gating finding, deferred low findings, and a one-line QA evidence quote. Keep it tight — this is the durable record. Commit these spec edits on the integration branch. Do NOT reference ephemeral build-process internals in any code you touch — only in spec/commit text.
+5. PROPAGATE DURABLE LESSONS now (commit on the integration branch): a retro lesson that changes the design → ARCHITECTURE.md or a new ADR; that changes the plan → ROADMAP.md; about how to build in this repo → CLAUDE.md. "Nothing material" is a valid outcome — don't manufacture lessons.
+6. PUSH + OPEN THE MR autonomously — do NOT wait for the human, do NOT ask permission (the human delegated finalization by running this build). \`git push -u origin integration/${ITERATION_SLUG}\`, then open ONE MR/PR against the repo's default branch using the project's forge (\`glab mr create\` / \`gh pr create\`; discover which from the remote). MR body = the decisions + load-bearing areas to review manually (contract changes, trust boundaries) + deferred/blocked items. Do NOT merge it. Return the MR URL in \`mrUrl\` — do NOT write it into any tracked file (that forces another commit/push and the back-link rots; the user gets it from your return). If push or MR-open genuinely fails (no remote, auth), set \`pushError\` to the exact error and \`mrOpened\`=false so the human can finish — that is the ONLY case where you stop short of an open MR.
+7. REPORT, for the deterministic teardown that runs next: set \`shipped\` to the feature ids whose commits you VERIFIED are present on \`integration/${ITERATION_SLUG}\` (do a \`git log\`/\`git cherry\` check — only ids you confirmed), and \`leftOut\` to the blocked/conflicting ids whose worktrees must be PRESERVED. Do NOT remove any worktree or branch yourself.
 
-Preliminary shippable (tests green, no unresolved gating — these get cherry-picked + shipped): ${JSON.stringify(shippable, null, 2)}
-Preliminary blocked (left out, worktrees preserved for the human): ${JSON.stringify(blocked, null, 2)}`,
-  { label: 'converge', phase: 'Converge', model: 'opus' },
+Preliminary shippable (tests green, no unresolved gating — cherry-pick + ship these): ${JSON.stringify(shippable.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath })), null, 2)}
+Preliminary blocked (leave OUT, preserve worktrees): ${JSON.stringify(blocked.map((r) => ({ id: r.featureId, branch: r.branch, unresolvedGating: r.unresolvedGating })), null, 2)}`,
+  { label: 'converge', phase: 'Converge', schema: CONVERGE_SCHEMA, model: 'opus' },
 )
 
-log(`Build complete. ${shippable.length} shippable (pushed + MR opened), ${blocked.length} blocked (worktrees preserved).`)
+// === Deterministic teardown ================================================
+// Teardown runs HERE, in workflow code, keyed off the ids the converge agent
+// VERIFIED shipped — not buried in the agent's checklist where an early stop
+// would silently skip it. Guard: only if the MR actually opened (a pushError
+// means the human still needs the branches), and only for ids in `shipped`
+// (never `leftOut`/blocked). A dedicated agent runs the git commands so it can
+// re-verify each commit is present before deleting and report what it did.
+const shipped = Array.isArray(convergence?.shipped) ? convergence.shipped : []
+const leftOut = Array.isArray(convergence?.leftOut) ? convergence.leftOut : blocked.map((r) => r.featureId)
+let teardown = null
+if (convergence?.mrOpened && !convergence?.pushError && shipped.length) {
+  teardown = await agent(
+    `Tear down the transient build scaffolding for iteration "${manifest.iterationName}" now that its MR is open. Work via git from the repo root; NEVER \`git checkout\`/\`switch\` the primary worktree (the human works there on main).
+
+For EACH shipped feature id [${shipped.join(', ')}]: FIRST re-verify its commits are present on \`integration/${ITERATION_SLUG}\` (\`git cherry\` / \`git log integration/${ITERATION_SLUG}\` — confirm before deleting; if a feature's commits are NOT there, do NOT delete it, report it under kept). Then for each confirmed one: \`git worktree remove ${WORKTREE_DIR}/<id-lowercased>\` and \`git branch -D feat/<id-lowercased>\`.
+Also remove the contract worktree \`${WORKTREE_DIR}/contracts\` (its commits are on \`${buildBranch}\`, which integration was cut from).
+KEEP, do NOT touch: the integration worktree/branch \`${WORKTREE_DIR}/integration\` (holds the pushed branch), \`${buildBranch}\`, and every LEFT-OUT/blocked feature's worktree+branch [${leftOut.join(', ') || 'none'}] (un-collected work — never delete it).
+
+Report exactly which worktrees + branches you removed and which you kept.`,
+    { label: 'teardown', phase: 'Converge', model: 'sonnet', schema: {
+      type: 'object',
+      required: ['removed', 'kept'],
+      properties: {
+        removed: { type: 'array', items: { type: 'string' } },
+        kept: { type: 'array', items: { type: 'string' } },
+        notes: { type: 'string' },
+      },
+    } },
+  )
+} else {
+  log(`Skipping teardown — ${convergence?.pushError ? 'push/MR-open failed' : 'no MR opened or nothing verified shipped'}. Worktrees preserved for the human.`)
+}
+
+const mrLine = convergence?.mrUrl
+  ? `MR: ${convergence.mrUrl}`
+  : (convergence?.pushError ? `MR NOT opened — ${convergence.pushError} (branch integration/${ITERATION_SLUG} is local; finish the push/MR by hand)` : 'MR status unknown — check the converge output')
+log(`Build complete. ${shipped.length} shipped, ${leftOut.length} left out. ${mrLine}`)
 
 return {
   iteration: manifest.iterationName,
@@ -565,11 +631,20 @@ return {
   buildBranch,
   worktreeDir: WORKTREE_DIR,
   contractCommit: barrier.commitSha,
-  shippable: shippable.map((r) => ({ id: r.featureId, branch: r.branch })),
-  blocked: blocked.map((r) => ({ id: r.featureId, branch: r.branch, unresolvedGating: r.unresolvedGating })),
-  convergenceReport: String(convergence).slice(0, 4000),
-  nextStep:
-    blocked.length > 0
-      ? `${shippable.length} feature(s) shipped on integration/${ITERATION_SLUG} (pushed, MR opened, their transient worktrees torn down). Review/merge that MR. The ${blocked.length} blocked feature(s) were left out — their worktrees/branches are preserved; resolve them with the human, then re-run or hand-land.`
-      : `All ${shippable.length} features shipped: integration/${ITERATION_SLUG} pushed, MR opened, transient per-feature worktrees torn down. Review and merge the MR (see the convergence report for the URL + manual-review hotspots).`,
+  integrationBranch: convergence?.integrationBranch ?? `integration/${ITERATION_SLUG}`,
+  mrOpened: convergence?.mrOpened === true,
+  mrUrl: convergence?.mrUrl ?? null, // returned to the user; never written to a file
+  pushError: convergence?.pushError ?? null,
+  shipped,
+  leftOut,
+  suiteGreen: convergence?.suiteGreen === true,
+  summary: convergence?.summary ?? '',
+  teardown: teardown ? { removed: teardown.removed ?? [], kept: teardown.kept ?? [] } : null,
+  // The MR URL is the deliverable — say it to the user; it is deliberately NOT
+  // written into any tracked file.
+  nextStep: convergence?.pushError
+    ? `Push/MR-open failed: ${convergence.pushError}. The integration branch integration/${ITERATION_SLUG} is assembled locally — finish pushing + opening the MR by hand. Worktrees were preserved.`
+    : leftOut.length > 0
+      ? `${shipped.length} feature(s) shipped on integration/${ITERATION_SLUG}; ${mrLine}. Review/merge that MR. ${leftOut.length} feature(s) were left out — their worktrees/branches are preserved; resolve them with the human, then re-run or hand-land.`
+      : `All ${shipped.length} features shipped on integration/${ITERATION_SLUG}; ${mrLine}. Review and merge the MR (see its body for manual-review hotspots). Transient worktrees were torn down.`,
 }

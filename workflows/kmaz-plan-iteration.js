@@ -44,7 +44,7 @@ export const meta = {
 // built concurrently without colliding. Don't reintroduce an unscoped name.
 //
 // `args` (all optional):
-//   { iterationDir?: string,   // current layout: the iteration dir to plan (default: docs/iterations/01-*)
+//   { iterationDir?: string,   // current layout: the iteration dir to plan (default: a finder agent picks the next INCOMPLETE iteration)
 //     featuresDir?: string,    // legacy layout: flat specs dir (e.g. docs/features); set this for legacy projects
 //     iterationSlug?: string,  // explicit slug to name-scope artifacts; else derived from iteration/iterationDir
 //     roadmap?: string,        // path to ROADMAP.md (default: docs/ROADMAP.md) for cross-iteration context
@@ -56,31 +56,36 @@ export const meta = {
 
 const FEATURES_DIR = args?.featuresDir ?? null // legacy flat layout when set
 const LEGACY = FEATURES_DIR !== null
-const ITERATION_DIR = args?.iterationDir ?? 'docs/iterations/01-*'
 const ROADMAP = args?.roadmap ?? 'docs/ROADMAP.md'
 const ITERATION = args?.iteration ?? null
 const EXPLICIT_FEATURES = Array.isArray(args?.features) ? args.features : null
 
-// Slug that name-scopes every artifact. Prefer an explicit slug; else derive
-// from the iteration name, else from the iteration-dir basename. Falls back to
-// 'iteration' only when nothing is known (single-iteration use is then still
-// correct; concurrent use should pass iteration/iterationSlug).
 function slugify(s) {
   return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
-const ITERATION_SLUG =
-  (args?.iterationSlug && slugify(args.iterationSlug)) ||
-  (ITERATION && slugify(ITERATION)) ||
-  (!ITERATION_DIR.includes('*') && slugify(ITERATION_DIR.replace(/\/$/, '').split('/').pop())) ||
-  'iteration'
 
-// Manifest filename ALWAYS carries the iteration slug — in both layouts — so a
-// build plan is searchable and unambiguous next to plans from other iterations.
-const MANIFEST_PATH =
-  args?.manifestPath ??
-  (LEGACY
-    ? `docs/BUILD-PLAN-${ITERATION_SLUG}.md`
-    : `${ITERATION_DIR.replace(/\/$/, '')}/BUILD-PLAN-${ITERATION_SLUG}.md`)
+// The iteration directory is NOT defaulted to a hardcoded '01-*' — that always
+// plans iteration 1, even after it has shipped. When the caller names it, use
+// it; otherwise it stays null here and a finder agent (in Scope) walks
+// docs/iterations/ and picks the FIRST not-yet-done iteration. Slug + manifest
+// path depend on the resolved dir, so they're computed AFTER resolution below.
+let ITERATION_DIR = args?.iterationDir ?? null
+let ITERATION_SLUG = (args?.iterationSlug && slugify(args.iterationSlug)) || (ITERATION && slugify(ITERATION)) || null
+let MANIFEST_PATH = args?.manifestPath ?? null
+
+// Compute slug + manifest path from whatever iteration dir we ended up with
+// (explicit or finder-resolved). Idempotent — safe to call once dir is known.
+function resolveArtifactPaths() {
+  if (!ITERATION_SLUG && ITERATION_DIR && !ITERATION_DIR.includes('*')) {
+    ITERATION_SLUG = slugify(ITERATION_DIR.replace(/\/$/, '').split('/').pop())
+  }
+  if (!ITERATION_SLUG) ITERATION_SLUG = 'iteration' // last-resort; concurrent use should pass a slug
+  if (!MANIFEST_PATH) {
+    MANIFEST_PATH = LEGACY
+      ? `docs/BUILD-PLAN-${ITERATION_SLUG}.md`
+      : `${(ITERATION_DIR ?? 'docs/iterations/' + ITERATION_SLUG).replace(/\/$/, '')}/BUILD-PLAN-${ITERATION_SLUG}.md`
+  }
+}
 
 // === Schemas ===============================================================
 
@@ -210,6 +215,42 @@ const CONTRACT_SPEC_SCHEMA = {
 // === Phase 1: Scope ========================================================
 
 phase('Scope')
+
+// FIND THE NEXT INCOMPLETE ITERATION (only when the caller didn't name one and
+// we're not in legacy flat mode). A cheap Haiku agent walks docs/iterations/ in
+// order and returns the first iteration directory that is NOT yet done — by its
+// README "Status" and whether its feature specs still have unchecked build-plan
+// boxes / unbuilt code. This replaces the old hardcoded 'docs/iterations/01-*'
+// default, which always planned iteration 1 even after it shipped.
+if (!ITERATION_DIR && !LEGACY) {
+  const finder = await agent(
+    `Find the NEXT INCOMPLETE iteration to plan. Read-only — do NOT write anything.
+
+List \`docs/iterations/\` in numeric order (01-, 02-, ...). For each iteration dir, decide if it is DONE: check its \`README.md\` Status, and whether its feature specs (the NN-<slug>.md files) show the work is finished — a "## Build plan (approved)" section with all boxes ticked, or shipped code/tests that satisfy its acceptance criteria. An iteration with no plan yet, or unchecked boxes, or unbuilt features is NOT done.
+
+Return the FIRST iteration dir (in numeric order) that is not done — that's the one to plan next. If every iteration looks done, return the highest-numbered one and set allDone=true (the human likely wants to add a new iteration). If \`docs/iterations/\` doesn't exist, set notFound=true.`,
+    { label: 'find-next-iteration', phase: 'Scope', model: 'haiku', schema: {
+      type: 'object',
+      required: ['iterationDir'],
+      properties: {
+        iterationDir: { type: 'string', description: 'path to the chosen iteration dir, e.g. docs/iterations/03-foo' },
+        reason: { type: 'string', description: 'one line: why this is the next incomplete one' },
+        allDone: { type: 'boolean', description: 'true if every iteration already looks complete' },
+        notFound: { type: 'boolean', description: 'true if docs/iterations/ does not exist' },
+      },
+    } },
+  )
+  if (finder?.notFound) {
+    log('⛔ No docs/iterations/ directory found. Pass iterationDir (current layout) or featuresDir+iteration (legacy flat) explicitly.')
+    return { stopped: true, reason: 'no-iterations-dir' }
+  }
+  ITERATION_DIR = finder.iterationDir
+  log(`Next incomplete iteration: ${ITERATION_DIR}${finder?.reason ? ` — ${finder.reason}` : ''}${finder?.allDone ? ' (all iterations look done — planning the latest)' : ''}`)
+}
+// Fall back to the legacy default sentinel only when truly nothing resolved it
+// (e.g. legacy mode with no dir) so the scope brief's own legacy path handles it.
+if (!ITERATION_DIR && !LEGACY) ITERATION_DIR = 'docs/iterations'
+resolveArtifactPaths()
 
 const scopeBrief = `You are scoping the build of ONE roadmap iteration. This is read-only reconnaissance — do NOT write or commit anything.
 
@@ -405,8 +446,8 @@ Use this structure (Markdown prose for humans, plus ONE fenced \`\`\`json block 
 **Status:** Awaiting approval · **Iteration goal:** ${scope.iterationGoal ?? ''} · **Iteration slug:** \`${ITERATION_SLUG}\`
 
 ## How to use this
-1. A human reviews this index + the per-feature "Build plan (approved)" sections in each spec, then flips Status to "Approved".
-2. On approval, run the build workflow: it implements + commits the frozen contracts first, then builds each feature in its own worktree (independent features concurrently, hard-dependent ones after their deps), reviews each, and returns a convergence report. Every artifact is scoped to the iteration slug above, so this iteration can build concurrently with others.
+1. A human reviews this index + the per-feature "Build plan (approved)" sections in each spec and approves it in conversation. The assistant flips Status to "Approved" and commits — the human does NOT edit this file.
+2. When the human is ready, they run the build workflow: it implements + commits the frozen contracts first, then builds each feature in its own worktree (independent features concurrently, hard-dependent ones after their deps), reviews each, opens ONE MR, and records each feature's outcome back into its spec. Every artifact is scoped to the iteration slug above, so this iteration can build concurrently with others.
 
 ## Blockers
 ${(scope.blockers && scope.blockers.length) ? scope.blockers.map((b) => `- ${b}`).join('\n') : '- None.'}
@@ -428,8 +469,9 @@ After writing, confirm the path.`,
   { label: 'write-index', phase: 'Persist', model: 'sonnet' },
 )
 
-log(`Plan complete. Review ${MANIFEST_PATH} + each spec's "Build plan (approved)" section, then run kmaz-build-iteration.`)
+log(`Plan complete. Present ${MANIFEST_PATH} + each spec's "Build plan (approved)" section to the human for approval.`)
 
+const _blocked = scope.blockers && scope.blockers.length
 return {
   iteration: scope.iterationName,
   iterationSlug: ITERATION_SLUG,
@@ -439,7 +481,12 @@ return {
   featureCount: goodPlans.length,
   features: goodPlans.map((p) => p.featureId),
   frozenContractCount: (contractSpec.frozenContracts ?? []).length,
-  nextStep: (scope.blockers && scope.blockers.length)
-    ? 'Resolve blockers with the human BEFORE building.'
-    : `Human approves the plan, then run kmaz-build-iteration with args { manifestPath: "${MANIFEST_PATH}" }. Artifacts are scoped to slug "${ITERATION_SLUG}", so this can build concurrently with other iterations.`,
+  // The plan is written with Status "Awaiting approval". A workflow can't take
+  // mid-run input, so approval happens in conversation: present the plan, and on
+  // the human's verbal approval the ASSISTANT (not the human) edits the plan's
+  // Status line to "Approved" and commits it — then STOPS. Launching the build
+  // stays user-triggered; do NOT auto-run it.
+  nextStep: _blocked
+    ? `Plan has ${scope.blockers.length} blocker(s) — resolve them with the human BEFORE approving or building. Do NOT flip Status to Approved while blockers stand.`
+    : `Present the plan (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) to the human. On their verbal approval, edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved" and git-commit just that file (the human does not touch it). Then tell the human they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself.`,
 }
