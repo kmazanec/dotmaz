@@ -22,6 +22,12 @@ The stages, in order, and the artifact each consumes/produces:
 | Merge | `kmaz-merge-and-cleanup` (skill) | a finished feature branch | linear `main`, scaffolding removed |
 | Review | `kmaz-review-comments` (skill) | an open PR/MR with feedback | fixes + durable lessons propagated upstream |
 
+`docs/STATUS.md` is the **rolling re-entry point** — a single short doc answering "where are we, what
+shipped, what's next" without reading five files. The roadmap stage seeds it (every iteration +
+feature, all "not started"); the build stage updates it at convergence (mark each shipped/blocked,
+set what's next). It is a *status*, not a plan — kept terse, always current. Whoever re-enters the
+project reads STATUS.md first.
+
 The human's deep involvement is concentrated at the **front** (PRD + architecture interviews)
 and at **one approval gate** (the plan). Everything after the plan approval is autonomous.
 This is deliberate: interview thoroughly up front, then let it build.
@@ -167,7 +173,19 @@ Beyond "tests pass," the pipeline builds for production. These are decided at ar
   metrics, health) is a named decision, not an afterthought.
 - **Simplicity & factoring** — prefer the simplest design that satisfies the requirement; resist
   over-abstraction. The smallest change that meets each acceptance criterion. Scope creep is a
-  planning decision, not a build-time one.
+  planning decision, not a build-time one. The bar is the simplest thing that works, well-factored —
+  not the most general thing imaginable. Speculative abstraction ("we might need it") is a defect,
+  not foresight.
+
+## Definition of done — trace back to the PRD, not just the spec
+
+A feature is done when it satisfies the **PRD's original acceptance criteria** (section 6) for what
+it delivers — not merely when its spec's checkboxes are ticked. The spec criteria are a derivative;
+the PRD is the source of truth for WHAT. Because PRD criteria are written as near-executable
+assertions (Given/When/Then, concrete values), "done" is checkable: at convergence the build confirms
+each shipped feature's behavior against the PRD criteria it traces to, not just against its own
+checklist. A feature whose spec boxes are ticked but whose PRD criterion isn't observably met is NOT
+done — that gap is exactly what an end-to-end check at convergence exists to catch.
 
 ## Hard rules (non-negotiable)
 

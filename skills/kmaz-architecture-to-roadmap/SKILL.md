@@ -251,6 +251,34 @@ What we're deliberately not building / deferring (mirror the PRD's Out-of-Scope 
 Unresolved things that affect the plan but not the architecture.
 ```
 
+### Step 8b — Seed `docs/STATUS.md` (the rolling re-entry point)
+
+Write a short `docs/STATUS.md` — the single doc someone reads to know where the project stands
+without opening five files (CONVENTIONS.md, "rolling re-entry point"). The build stage keeps it
+current at each convergence; you seed it with everything "not started":
+
+```markdown
+# Status — <Project Name>
+
+**Updated:** <date> · **Roadmap:** [ROADMAP.md](./ROADMAP.md)
+
+## Now
+<one line: nothing built yet — next up is iteration 01.>
+
+## Iterations
+| # | Iteration | Status | Notes |
+|---|-----------|--------|-------|
+| 01 | <name> | Not started | |
+| 02 | <name> | Not started | (independent of 01 — can build concurrently) |
+...
+
+## What's next
+The immediate next action (e.g. "run kmaz-plan-iteration on docs/iterations/01-<slug>/").
+```
+
+Keep it terse — it's a status, not a second roadmap. Mark which iterations are independent (can run
+concurrently) so the re-entry reader sees the parallelism at a glance.
+
 ### Step 9 — Write each iteration's feature specs
 
 For each iteration, create `docs/iterations/NN-<slug>/` and write its feature specs into it. The

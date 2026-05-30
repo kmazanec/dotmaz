@@ -148,8 +148,14 @@ Write `docs/PRD.md` (create `docs/` if absent) in **exactly** this structure:
 Each requirement independently verifiable.]
 
 ## 6. Acceptance Criteria
-[Numbered, unambiguous conditions. A coding agent should read each and determine
-pass/fail with no interpretation required.]
+[Numbered, unambiguous conditions a coding agent reads and judges pass/fail with NO
+interpretation. Write each as a near-executable assertion in Given/When/Then form —
+"Given <state>, when <action>, then <observable, checkable outcome>" — so it maps
+almost 1:1 onto a test. Name concrete values, not adjectives: "responds in <200ms at
+p95 for 100 concurrent users", not "fast"; "rejects a payload >1MB with HTTP 413", not
+"handles large inputs". If a criterion can't be phrased as something a test could
+assert, it isn't finished — sharpen it. These criteria ARE the build's test spec; the
+build should be transcribing them, not interpreting them.]
 
 ## 7. Dependencies
 [What must exist or be true for this to succeed]
@@ -175,6 +181,10 @@ updated — never silently change decisions.
 - **Write for coding agents.** Every requirement must be precise enough that an agent with no
   prior context could implement it without guessing. No ambiguity. No "it should feel nice" —
   define what "nice" means.
+- **Acceptance criteria are near-executable.** Each one maps almost 1:1 onto a test (Given/When/Then,
+  concrete values, observable outcomes). If you can't imagine the test, the criterion is too vague.
+  This is what lets the build transcribe criteria into tests instead of interpreting them — every bit
+  of interpretation left here is drift introduced downstream.
 - **Plain language.** Avoid PM jargon. A requirement that can't be explained simply isn't clear
   enough yet.
 - **Number everything** — requirements, acceptance criteria, open questions — for easy reference.

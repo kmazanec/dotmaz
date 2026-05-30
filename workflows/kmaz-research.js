@@ -284,6 +284,8 @@ Project gist: ${frame.projectGist}`,
 )
 
 log(`Research complete. ${verifiedDomains.length} file(s) under ${OUT_DIR}/ + README index.`)
+// Cost visibility: rough output-token spend for this research run (shared turn pool).
+try { log(`Spend: ~${Math.round(budget.spent() / 1000)}k output tokens so far this turn (depth=${DEPTH}, ${verifiedDomains.length} domain(s)).`) } catch {}
 
 return {
   outDir: OUT_DIR,

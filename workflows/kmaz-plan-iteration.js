@@ -116,6 +116,7 @@ const SCOPE_SCHEMA = {
           touchesContracts: { type: 'array', items: { type: 'string' }, description: 'names of shared contracts this feature introduces, consumes, or extends' },
           dependenciesVerifiedInCode: { type: 'boolean', description: 'true only if the stated dependencies actually exist in the code, not just the plan' },
           highUncertainty: { type: 'boolean', description: 'true ONLY for a feature whose approach is genuinely unsettled and worth THREE independent planning drafts instead of one: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open. A routine feature that extends an established pattern is NOT high-uncertainty — default false. Keep this rare; most features get the single-pass planner.' },
+          highUncertaintyReason: { type: 'string', description: 'REQUIRED whenever highUncertainty=true: the CONCRETE reason — name the load-bearing contract, the specific novel/subtle algorithm or security/concurrency boundary, or exactly what the spec leaves open. A vague reason ("seems complex", "might be tricky") does NOT justify the 3-draft panel — if you can\'t name a concrete reason, set highUncertainty=false. Empty when highUncertainty=false.' },
         },
       },
     },
@@ -281,7 +282,7 @@ Then, for EACH feature you'll plan:
 - Read its spec in full: description, dependencies, acceptance criteria, testing requirements, manual setup.
 - VERIFY its stated dependencies actually exist in the code (inspect the real code of dependency features, not just the plan). Set dependenciesVerifiedInCode accordingly. Trust the code over the plan where they diverge.
 - Identify which shared contracts it introduces/consumes/extends.
-- Set \`highUncertainty\` deliberately. Default FALSE — a routine feature that extends an established pattern gets a single planning pass. Set TRUE only when the APPROACH is genuinely unsettled and worth three independent planning drafts: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open. This is RARE — most iterations have ZERO such features. Flagging everything high-uncertainty defeats the point and burns tokens.
+- Set \`highUncertainty\` deliberately, and when true give a CONCRETE \`highUncertaintyReason\`. Default FALSE — a routine feature that extends an established pattern gets a single planning pass. Set TRUE only when the APPROACH is genuinely unsettled and worth three independent planning drafts: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open — and NAME which of these in highUncertaintyReason (the specific contract, algorithm, boundary, or open question). A vague reason won't trigger the panel; if you can't name a concrete one, set false. This is RARE — most iterations have ZERO such features. Flagging everything high-uncertainty defeats the point and burns tokens.
 - Set \`dependsOn\` to the feature ids this one HARD-depends on (it consumes their not-yet-shipped behavior). This is the only ordering signal the build uses, so keep it minimal and real — a contract-mediated soft dep is NOT a hard dep (it builds against the frozen shape, so leave it out), and a spurious edge needlessly serializes the build.
 
 Plan ALL the iteration's features — the independent ones AND the hard-dependent ones; do NOT drop a feature for having a hard dep. The build workflow serializes a feature behind its \`dependsOn\` automatically and runs everything else concurrently. Only raise a blocker when a dependency is genuinely MISSING FROM THE CODE, never merely because it builds later.
@@ -322,6 +323,7 @@ const SINGLE_PASS_PLAN = (f) =>
 • ARCHITECT: ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria; honor every locked ADR + existing code pattern; smallest change that satisfies each criterion; name which chunks touch shared contracts and the exact additive signature each needs frozen.
 • RESEARCHER (reuse): what library/pattern does the existing code already use for this kind of work? footguns / version / platform limits the spec misses? a simpler path using something already in the tree? Maximize reuse; flag technology risk.
 • CONTRARIAN (traps): where are acceptance criteria ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? Route the plan AROUND these and carry the survivors into \`risks\`.
+• SIMPLICITY (factoring): is this the SIMPLEST design that satisfies the criteria? Cut any speculative abstraction, premature generalization, indirection layer, or config knob the spec doesn't require — "we might need it" is a defect, not foresight. Prefer fewer moving parts, plain functions over frameworks-for-one-use, the obvious data shape. The plan should read as the smallest well-factored thing that works.
 For each chunk name the specific test file(s)/target(s) that prove it, so the build can run JUST those tests (not the whole suite). Pin the exact frozen signature for every contract touchpoint. Return the structured plan.`
 
 // ESCAPE HATCH (rare): a highUncertainty feature — or a run forced via
@@ -335,13 +337,26 @@ const LENSES = [
   { key: 'contrarian', prompt: (f) => `You are a CONTRARIAN / skeptical senior engineer reviewing feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and dependencies. Find what's WRONG with the obvious approach: where will acceptance criteria be ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? Return a plan that routes around the traps, plus an explicit \`risks\` list of what a builder must not get wrong.` },
 ]
 
+// Evidence gate: the 4-Opus-agent panel only fires when highUncertainty is
+// backed by a CONCRETE reason — not a bare guess. A forced run (args.multiDraft)
+// bypasses the gate; otherwise we require a non-trivial reason string so a Sonnet
+// scope agent's optimistic "true" with no substance falls back to the single pass.
+function panelJustified(f) {
+  if (FORCE_MULTIDRAFT) return true
+  if (f.highUncertainty !== true) return false
+  const reason = String(f.highUncertaintyReason ?? '').trim()
+  return reason.length >= 20 // a real, specific reason — not "" or "complex"
+}
+
 async function planFeature(f) {
-  const multi = FORCE_MULTIDRAFT || f.highUncertainty === true
+  const multi = panelJustified(f)
   if (!multi) {
-    // Single-pass planner (the common path).
+    // Single-pass planner (the common path). If highUncertainty was flagged
+    // without a concrete reason, we land here deliberately.
+    if (f.highUncertainty === true) log(`${f.id}: highUncertainty flagged without a concrete reason — using the single-pass planner.`)
     return agent(SINGLE_PASS_PLAN(f), { label: `plan:${f.id}`, phase: 'Plan', schema: FEATURE_PLAN_SCHEMA, model: 'opus' })
   }
-  // High-uncertainty: three independent drafts → synth.
+  // High-uncertainty (justified): three independent drafts → synth.
   const drafts = (
     await parallel(LENSES.map((lens) => () => agent(lens.prompt(f), { label: `draft:${f.id}:${lens.key}`, phase: 'Plan', model: 'opus' })))
   ).filter(Boolean)
@@ -357,8 +372,8 @@ Produce the single best plan: take the architect's structure, graft the research
   )
 }
 
-const multiCount = featuresToplan.filter((f) => FORCE_MULTIDRAFT || f.highUncertainty === true).length
-log(`Planning ${featuresToplan.length} feature(s): ${featuresToplan.length - multiCount} single-pass, ${multiCount} multi-draft (high-uncertainty).`)
+const multiCount = featuresToplan.filter(panelJustified).length
+log(`Planning ${featuresToplan.length} feature(s): ${featuresToplan.length - multiCount} single-pass, ${multiCount} multi-draft (justified high-uncertainty).`)
 
 const featurePlans = await parallel(featuresToplan.map((f) => () => planFeature(f)))
 
@@ -484,6 +499,8 @@ After writing, confirm the path.`,
 )
 
 log(`Plan complete. Present ${MANIFEST_PATH} + each spec's "Build plan (approved)" section to the human for approval.`)
+// Cost visibility: rough output-token spend for this plan run (shared turn pool).
+try { log(`Spend: ~${Math.round(budget.spent() / 1000)}k output tokens so far this turn (${goodPlans.length} feature(s) planned, ${multiCount} via the multi-draft panel).`) } catch {}
 
 const _blocked = scope.blockers && scope.blockers.length
 return {
@@ -502,5 +519,5 @@ return {
   // stays user-triggered; do NOT auto-run it.
   nextStep: _blocked
     ? `Plan has ${scope.blockers.length} blocker(s) — resolve them with the human BEFORE approving or building. Do NOT flip Status to Approved while blockers stand.`
-    : `Present the plan (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) to the human. On their verbal approval, edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved" and git-commit just that file (the human does not touch it). Then tell the human they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself.`,
+    : `Present AND TEACH the plan to the human (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) — the approval gate is a teaching moment, not just a yes/no. Walk them through: WHY the iteration was sliced into these features in this dependency order; which shared contracts got frozen and what each commits the build to; where the real risk concentrates (the riskiest chunks, the convergence-prone contracts); and which features will build concurrently vs. serialize. The human should be able to re-explain the build approach before approving it. THEN, on their verbal approval, edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved" and git-commit just that file (the human does not touch it). Then tell them they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself.`,
 }

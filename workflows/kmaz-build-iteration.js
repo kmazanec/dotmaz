@@ -34,28 +34,16 @@ export const meta = {
 // transient per-feature worktrees/branches once the MR is open and the commits
 // are verified present. Blocked features are left out, worktrees preserved.
 //
-// MODEL TIERS: Sonnet builds, Opus reviews. The approved per-spec plans are
-// detailed enough that Sonnet implements every feature — even high-stakes work —
-// to the checklist. Opus is reserved for the review pass (the judgment step);
-// when the reviewer confirms a gating finding it delegates the fix back to a
-// Sonnet fixer rather than implementing it itself. Opus thinks, Sonnet types.
-//
-// SCHEDULING: the plan names hard dependencies (feature.after). The build
-// schedules from those alone — a feature with no deps starts as soon as the
-// contracts are frozen; a dependent one waits on its deps. Independent work runs
-// concurrently as a free consequence of the dependency graph; there is no
-// parallel-vs-linear bookkeeping. A linear iteration just serializes naturally.
-//
-// ISOLATION: all build work is autonomous, so it ALWAYS runs in its own worktree
-// under .claude/worktrees/ on its own branch — the primary worktree (where the
-// human works on main, live) is NEVER touched or branch-switched. ONE worktree
-// per FEATURE; the contract step runs first on a shared build branch (its own
-// worktree) that every feature worktree forks from.
+// MODEL TIERS, SCHEDULING, ISOLATION: per CONVENTIONS.md — Sonnet builds / Opus
+// reviews (the reviewer delegates fixes back to a Sonnet fixer); the build
+// schedules all concurrency off feature.after (hard deps); all work is isolated
+// in .claude/worktrees/, never the primary worktree. This workflow's specifics:
+// ONE worktree per FEATURE, and the contract step runs first on a shared build
+// branch (its own worktree) that every feature worktree forks from.
 //
 // PARALLEL ITERATIONS: every artifact is slug-scoped — build/<slug>, worktrees
-// under .claude/worktrees/<slug>/, integration/<slug>. Two iterations build
-// concurrently without colliding on a branch or a worktree path. Don't
-// reintroduce an unscoped shared name.
+// under .claude/worktrees/<slug>/, integration/<slug> — so two iterations build
+// concurrently without colliding. Don't reintroduce an unscoped shared name.
 //
 // The plan file (BUILD-PLAN-<slug>.md) carries each feature's specPath, so this
 // workflow is layout-agnostic — it reads whatever paths the plan names.
@@ -275,6 +263,7 @@ const CONVERGE_SCHEMA = {
     shipped: { type: 'array', items: { type: 'string' }, description: 'feature ids whose commits you VERIFIED are present on the integration branch — these are safe to tear down' },
     leftOut: { type: 'array', items: { type: 'string' }, description: 'feature ids left out (blocked or conflicting) — their worktrees/branches MUST be preserved' },
     summary: { type: 'string', description: 'short human-facing summary of decisions + manual-review hotspots (mirrors the MR body)' },
+    learned: { type: 'string', description: 'what building this iteration TAUGHT, in 2-4 plain sentences for the human: a library footgun hit, a perf cliff, a contract that needed an extra variant, an assumption that proved wrong, a place the design fought the implementation. The teaching version of the propagated lessons — empty only if genuinely nothing notable surfaced.' },
   },
 }
 
@@ -434,7 +423,7 @@ Cover ALL SIX dimensions in that one read:
 • security: input validation, injection, secret handling, authn/authz, trust boundaries, SSRF, project safety invariants. high/medium = GATING.
 • contrarian: ignore the happy path — the input/state/integration that BREAKS an invariant or defeats a criterion, or a test passing for the wrong reason. Defeating a criterion = gating.
 • robustness: edge cases, failure modes, error handling, resource cleanup, concurrency, retries, timeouts. high/medium gating.
-• efficiency: needless work, hot-path allocations, N+1 queries, oversized payloads, wasted re-renders. Rarely gating unless it breaks a stated perf criterion.
+• efficiency: (use the \`efficiency\` dimension for both performance AND simplicity findings). PERFORMANCE — needless work, hot-path allocations, N+1 queries, oversized payloads, wasted re-renders; rarely gating unless it breaks a stated perf criterion. SIMPLICITY/FACTORING — speculative abstraction, premature generalization, an indirection layer or config knob nothing needs, a framework-for-one-use, copy-paste that should be one function, a data shape more complex than the problem; flag the simpler equivalent. Simplicity findings are rarely gating (they're cleanups, not bugs) unless the over-engineering actively obscures a correctness/security issue.
 • convention: grep the diff for \`F-[0-9]\` and for build-process language in CODE COMMENTS ("build plan", "iteration", "manifest", "as planned") — flag EVERY hit in code/config/env-templates/prompts/committed-docs (such refs are allowed ONLY in the spec file / commit messages); flag inline architectural decisions that belong in an ADR; flag any secret/.env content. These convention hits are ALWAYS gating.
 
 For EACH finding: read the cited code to CONFIRM it is real before reporting it; set selfVerified:true only when you did. OMIT anything you cannot confirm rather than reporting it speculatively. For each GATING finding write a concrete, localized \`fix\` a Sonnet engineer can apply at the cited location without re-investigating. If a fix would need a frozen-contract change OR a re-architecture (not a localized edit), set escalated:true — that one goes to the human, not the fixer. Record low/non-gating findings too (no fix needed). Return all findings.`,
@@ -581,9 +570,9 @@ const convergence = await agent(
 1. ASSEMBLE the SHIPPABLE feature branches (below) onto an iteration-scoped integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration never collides). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Ship SHIPPABLE features only; leave any blocked feature OUT (its branch/worktree stays untouched for the human).
    LINEAR HISTORY IS MANDATORY — ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature's commits in dependency order (\`git cherry-pick\`), or \`git rebase --onto\`. NEVER \`git merge\` (and never \`cherry-pick -m\`) — a merge commit is a failure. Resolve predicted convergence in place as ordinary commits. If a real conflict needs human judgment, leave that feature OUT (treat it as blocked) and report it in \`leftOut\` — don't force it. VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing; quote the empty result in \`linearHistoryProof\`.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch — this is the ONE full-suite run (the per-feature build + fix steps ran only impacted tests). Fix any failures here: a failure now is an integration break the scoped runs couldn't see. The suite MUST end green before you push.
-3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`}
+3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`} DEFINITION OF DONE — trace to the PRD, not just the spec: for each shipped feature, confirm it observably satisfies the PRD acceptance criteria it traces to (the spec's "Requirements traced" links them; the PRD's section 6 criteria are written as Given/When/Then assertions). A feature whose spec boxes are ticked but whose PRD criterion isn't met is NOT done — record it as not-done in that feature's outcome (step 4) and treat it as left-out, not shipped.
 4. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC (there is NO separate convergence-report file). For each feature, append a short "### Build outcome" note under its "## Build plan (approved)" section in its spec file: shippable y/n, acceptance status, any unresolved gating finding, deferred low findings, and a one-line QA evidence quote. Keep it tight — this is the durable record. Commit these spec edits on the integration branch. Do NOT reference ephemeral build-process internals in any code you touch — only in spec/commit text.
-5. PROPAGATE DURABLE LESSONS now (commit on the integration branch): a retro lesson that changes the design → ARCHITECTURE.md or a new ADR; that changes the plan → ROADMAP.md; about how to build in this repo → CLAUDE.md. "Nothing material" is a valid outcome — don't manufacture lessons.
+5. PROPAGATE DURABLE LESSONS now (commit on the integration branch): a retro lesson that changes the design → ARCHITECTURE.md or a new ADR; that changes the plan → ROADMAP.md; about how to build in this repo → CLAUDE.md. "Nothing material" is a valid outcome — don't manufacture lessons. Separately, fill \`learned\` with the TEACHING version of what building taught (2-4 plain sentences for the human) — the footgun, the perf cliff, the contract that needed another variant, the assumption that broke — so the human learns from the build, not just the agents. This is returned to the human, not written to a file. ALSO update \`docs/STATUS.md\` if it exists (commit on the integration branch): mark this iteration's shipped features shipped and any blocked ones blocked, set the "Now"/"What's next" lines to reflect reality (e.g. the next iteration to plan/build, noting any that can run concurrently). Keep it terse — it's the project's rolling re-entry point. If STATUS.md doesn't exist, skip it (an older project may predate it).
 6. PUSH + OPEN THE MR autonomously — do NOT wait for the human, do NOT ask permission (the human delegated finalization by running this build). \`git push -u origin integration/${ITERATION_SLUG}\`, then open ONE MR/PR against the repo's default branch using the project's forge (\`glab mr create\` / \`gh pr create\`; discover which from the remote). MR body = the decisions + load-bearing areas to review manually (contract changes, trust boundaries) + deferred/blocked items. Do NOT merge it. Return the MR URL in \`mrUrl\` — do NOT write it into any tracked file (that forces another commit/push and the back-link rots; the user gets it from your return). If push or MR-open genuinely fails (no remote, auth), set \`pushError\` to the exact error and \`mrOpened\`=false so the human can finish — that is the ONLY case where you stop short of an open MR.
 7. REPORT, for the deterministic teardown that runs next: set \`shipped\` to the feature ids whose commits you VERIFIED are present on \`integration/${ITERATION_SLUG}\` (do a \`git log\`/\`git cherry\` check — only ids you confirmed), and \`leftOut\` to the blocked/conflicting ids whose worktrees must be PRESERVED. Do NOT remove any worktree or branch yourself.
 
@@ -629,6 +618,8 @@ const mrLine = convergence?.mrUrl
   ? `MR: ${convergence.mrUrl}`
   : (convergence?.pushError ? `MR NOT opened — ${convergence.pushError} (branch integration/${ITERATION_SLUG} is local; finish the push/MR by hand)` : 'MR status unknown — check the converge output')
 log(`Build complete. ${shipped.length} shipped, ${leftOut.length} left out. ${mrLine}`)
+// Cost visibility: rough output-token spend for this build run (shared turn pool).
+try { log(`Spend: ~${Math.round(budget.spent() / 1000)}k output tokens so far this turn (${manifest.features.length} feature(s) built + reviewed).`) } catch {}
 
 return {
   iteration: manifest.iterationName,
@@ -644,6 +635,9 @@ return {
   leftOut,
   suiteGreen: convergence?.suiteGreen === true,
   summary: convergence?.summary ?? '',
+  // What building taught the human — relay this to them, it's the build's
+  // contribution to the teach-the-human loop. Not written to any file.
+  learned: convergence?.learned ?? '',
   teardown: teardown ? { removed: teardown.removed ?? [], kept: teardown.kept ?? [] } : null,
   // The MR URL is the deliverable — say it to the user; it is deliberately NOT
   // written into any tracked file.
