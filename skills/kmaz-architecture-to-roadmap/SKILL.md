@@ -170,12 +170,17 @@ UI — resist splitting into prerequisite setup features); each later feature ex
 
 ### Step 3 — Identify cross-cutting contracts (index to ADRs)
 
-Walk the candidate list. For each pair of features sharing state, types, schemas, or visual
-conventions, name the contract that binds them, and **cite the ADR that decided it** (source of
-truth), plus the introducing feature and the extending features. Don't re-derive the decision from
-the specs — the architecture already made it; you're building the index the planner freezes against.
-This becomes the ROADMAP contracts table and feeds `kmaz-plan-iteration`'s contract-freezing step
-directly.
+Start from the architecture: ARCHITECTURE.md's decision index flags contract-bearing ADRs in its
+**Contract** column, and each such ADR's "Consequences for the build" names the contract's shape +
+exhaustive consumers. Those ADRs ARE your contracts — index them. Then walk the candidate feature
+list for any shared shape that has no ADR yet (a pair of features sharing state, types, schemas, or
+visual conventions with nothing in the architecture behind it): name it, and flag it as a possible
+architecture gap (it may warrant an ADR).
+
+For each contract, **cite the ADR that decided it** (source of truth), plus the introducing feature
+and the extending features. Don't re-derive the decision from the specs — the architecture already
+made it; you're building the index the planner freezes against. This becomes the ROADMAP contracts
+table and feeds `kmaz-plan-iteration`'s contract-freezing step directly.
 
 ### Step 4 — Group features into iterations
 

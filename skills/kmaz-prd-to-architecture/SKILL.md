@@ -96,6 +96,12 @@ Read `docs/PRD.md` in full. Then produce, for your own use, two lists:
   observability"). You walk the user through one round at a time.
 - **The technologies in play**: every technology, framework, API, or platform a requirement
   implies. This seeds the technology research.
+- **The shared cross-cutting contracts**: which decisions establish a *shape multiple features will
+  share* — a tagged union/enum of operations, a wire/message schema, a shared validator, a
+  provider/plugin interface, the brand/voice contract. Flag these now, because their ADRs need extra
+  detail (shape + exhaustive consumers — see Step 4a's "Contract consequences"): the roadmap indexes
+  them as contract source-of-truth and `kmaz-plan-iteration` freezes concrete signatures against
+  them. A shared contract whose ADR is thin forces the build to guess the shape.
 
 Note the **target company**, if the PRD or its research names one. Scan what already exists in the
 repo so the design reflects reality, not greenfield assumptions.
@@ -164,7 +170,7 @@ earlier one gets a *new* ADR that supersedes it.
 ```markdown
 # ADR-NNN: <the decision, stated as a choice>
 
-**Status:** Accepted · **Date:** <YYYY-MM-DD> · **Stretch:** <yes/no>
+**Status:** Accepted · **Date:** <YYYY-MM-DD> · **Stretch:** <yes/no> · **Contract:** <yes/no>
 **Supersedes:** <ADR-XXX or none> · **Superseded by:** <ADR-YYY or none>
 
 ## Context
@@ -186,10 +192,28 @@ What we gave up, what could go wrong, how we'd mitigate or when we'd revisit. Na
 non-negotiable — it's the proof we actually chose.
 
 ## Consequences for the build
-Anything downstream features or skills need to know (e.g. "all persistence uses Drizzle; no raw
-SQL", "auth is session-cookie based, not JWT"). This is what makes the ADR usable from a feature
-spec.
+Anything downstream features or skills need to know. Two kinds — include whichever apply:
+
+- **Policy consequences** — a rule every feature must follow (e.g. "all persistence uses Drizzle; no
+  raw SQL", "auth is session-cookie based, not JWT"). State them plainly.
+- **Contract consequences** — present ONLY if this decision establishes a *shared cross-cutting
+  contract*: an extensible shape multiple features introduce/consume/extend (a tagged union, an enum,
+  a wire/message schema, a shared validator, a provider interface, a brand/voice contract). When it
+  does, set **Contract: yes** in the header above and give the build stages enough to freeze it:
+  - **Source of truth** — the file the shape will live in (e.g. `packages/core/src/action.ts`).
+  - **Shape** — the minimum-viable form: the type/union/enum and its initial members/fields. Not a
+    final signature (the planner freezes that), but the concrete starting shape, not a hand-wave.
+  - **Exhaustive consumers** — the *categories* of code that must handle every case of this shape and
+    must not silently fall out of sync (e.g. "every reducer, the wire (de)serializer, the API
+    validator"). This is what lets the build land all variants up front instead of breaking later.
+
+  The roadmap will index this ADR as the contract's source of truth, and `kmaz-plan-iteration` freezes
+  a concrete signature *consistent with this section*. A contract decision whose build consequences
+  are just "we use a tagged union" is too thin — name the shape and the exhaustive consumers.
 ```
+
+Add **· Contract: <yes/no>** to the ADR header line for any decision that establishes a shared
+cross-cutting contract, so the roadmap stage can find them at a glance.
 
 When a decision changes: write a new ADR with `**Supersedes:** ADR-NNN`, and set the old one's
 header to `**Status:** Superseded` / `**Superseded by:** ADR-MMM`. Never delete or rewrite the old
@@ -218,11 +242,13 @@ features add components.
 
 ## Decision index
 A table of every ADR with one-line summaries. The ADR files are the source of truth; this index
-makes them findable. Never restate an ADR's rationale/tradeoffs here.
+makes them findable. Never restate an ADR's rationale/tradeoffs here. The **Contract** column flags
+ADRs that establish a shared cross-cutting contract — the roadmap stage indexes exactly these as
+contract source-of-truth.
 
-| ADR | Decision | Status | Stretch |
-|-----|----------|--------|---------|
-| [ADR-001](./adrs/ADR-001-<slug>.md) | <one-line summary> | Accepted | no |
+| ADR | Decision | Status | Stretch | Contract |
+|-----|----------|--------|---------|----------|
+| [ADR-001](./adrs/ADR-001-<slug>.md) | <one-line summary> | Accepted | no | no |
 
 ## Stretch features
 For each committed stretch feature: what it is, why it impresses this CTO / fits the portfolio /
@@ -256,6 +282,12 @@ Then verify the package is CTO-ready:
 - **ARCHITECTURE.md doesn't restate ADR rationale/tradeoffs** — it links; duplication drifts.
 - **Every ADR has real "Tradeoffs & risks" and "Consequences for the build" sections.** No named
   cost = the alternative wasn't actually considered.
+- **Every shared cross-cutting contract has a contract-bearing ADR (`Contract: yes`) that names its
+  source of truth, its shape, and its exhaustive consumers.** Walk the decision surface's contract
+  list (Step 1): each one must have an ADR detailed enough that the roadmap can cite it and
+  `kmaz-plan-iteration` can freeze a concrete signature against it. A contract ADR that only says
+  "we use a tagged union" without the shape + the consumers that must stay exhaustive is too thin —
+  the build will guess. Fix it here, not downstream.
 - **Every rationale is specific to this PRD/company**, not a generic platitude. Tie it to context.
 - **Every decision traces to a PRD requirement** (or an accepted stretch feature that was folded
   back into the PRD). No orphan decisions; no uncovered requirements.
