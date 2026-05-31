@@ -51,6 +51,7 @@ its ecosystem so code is judged and refactored through their lens:
 | `matt-pocock`       | Matt Pocock + Anders Hejlsberg + Ryan Cavanaugh | TypeScript (base): type system + general code quality |
 | `dan-abramov`       | Dan Abramov + Kent C. Dodds | React (layers on TS base): effects, renders, state, hooks, testing, a11y |
 | `ryan-dahl`         | Ryan Dahl + Matteo Collina | Node/backend (layers on TS base): async/errors, event loop, streams, robustness |
+| `paul-hudson`       | Paul Hudson + Chris Lattner + John Sundell | Swift/iOS: idiom, value semantics, concurrency safety, SwiftUI/UIKit, architecture |
 
 Multi-persona agents reason as each voice, agree where the voices agree, and
 **name and resolve the tension** where they'd differ. The TypeScript agents are
@@ -60,9 +61,9 @@ general code quality, and a framework panel (`dan-abramov` for React,
 
 ### Auditor skills (`skills/*-auditor`)
 
-The `rails-auditor`, `go-auditor`, `python-auditor`, and `typescript-auditor`
-skills share one **fan-out → consolidate → fix → verify-once** process for
-auditing and refactoring an existing codebase for idiom, design, and
+The `rails-auditor`, `go-auditor`, `python-auditor`, `typescript-auditor`, and
+`swift-auditor` skills share one **fan-out → consolidate → fix → verify-once**
+process for auditing and refactoring an existing codebase for idiom, design, and
 best-practice violations:
 
 1. **Scope** the project (cheap, on the orchestrator).
