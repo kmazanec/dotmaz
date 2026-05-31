@@ -27,11 +27,13 @@ correct (the framework auditors own that). It is largely **framework-agnostic** 
 markup, components, and styles (and, ideally, the running UI) regardless of React/Vue/Svelte/Rails
 views/SwiftUI/plain HTML.
 
-> **Run by Adam Wathan & Steve Schoger (with Brad Frost).** Every audit and fix sub-agent is dispatched
-> as the `adam-wathan` agent so the UI is judged through three "engineers who can design" minds:
-> Wathan/Schoger's visual craft (hierarchy, spacing, type, color, depth — Refactoring UI) and Frost's
-> design-systems rigor (components, tokens, consistency). The orchestrator stays neutral — it scopes,
-> coordinates, drives the running UI for evidence, integrates, and runs the gates.
+> **Run by Adam Wathan & Steve Schoger (with Brad Frost and Paula Scher).** Every audit and fix
+> sub-agent is dispatched as the `adam-wathan` agent so the UI is judged through four design minds:
+> Wathan/Schoger's visual craft (hierarchy, spacing, type, color, depth — Refactoring UI), Frost's
+> design-systems rigor (components, tokens, consistency), and **Paula Scher's bold art-direction voice**
+> (type as hero, fearless scale and color, a point of view that makes a design memorable, not just
+> correct). The orchestrator stays neutral — it scopes, coordinates, drives the running UI for evidence,
+> integrates, and runs the gates.
 
 ## The core loop
 
@@ -82,6 +84,12 @@ the screenshots:
 - **Design system & consistency** — duplicated component variants that should be one; magic values instead
   of tokens; a fourth button style; drift between screens; one-off styles that should be primitives; ad-hoc
   dark-mode hacks; iconography/radius inconsistency.
+- **Art direction & distinctiveness (the Scher lens)** — is this memorable or just correct? timid type
+  with no scale contrast; no focal point or compositional drama; a generic "AI-default"/template look with
+  no point of view; one tasteful accent doing all the work with no conviction; a hero/landing/brand surface
+  that plays it safe where it should commit to a voice (color, type, composition). Weigh by context — a
+  dense settings panel shouldn't shout; a marketing/landing/brand surface shouldn't whisper. The default
+  failure of dev-built UI is *forgettable*, so on impression-making surfaces, push toward distinctiveness.
 - **States** — missing or unstyled empty, loading (skeleton), error, disabled, and hover/focus states; no
   feedback on action; blank-box empty states that don't guide.
 - **Accessibility (WCAG)** — contrast below AA (4.5:1 body / 3:1 large/UI); color-only meaning; missing
