@@ -54,13 +54,14 @@ code is judged and refactored through their lens. **Language/ecosystem** panels:
 | `paul-hudson`       | Paul Hudson + Chris Lattner + John Sundell | Swift/iOS: idiom, value semantics, concurrency safety, SwiftUI/UIKit, architecture |
 | `niko-matsakis`     | Niko Matsakis + Jon Gjengset + Steve Klabnik | Rust: ownership, safety, `unsafe`, error handling, idiom |
 
-**Cross-cutting** panels — language-agnostic, applicable to any codebase:
+**Cross-cutting** panels — applicable across codebases and domains:
 
 | Agent               | Persona(s) | For |
 | ------------------- | ---------- | --- |
 | `troy-hunt`         | Troy Hunt + Tanya Janca + Dafydd Stuttard | Security: OWASP, injection, authz, secrets, crypto (defensive) |
 | `paula-scher`       | Paula Scher + Adam Wathan + Steve Schoger + Brad Frost | Frontend design/UX: art direction, hierarchy, spacing, type, color, design systems, WCAG a11y |
 | `kelsey-hightower`  | Kelsey Hightower + Mitchell Hashimoto + Charity Majors | DevOps/platform: IaC, containers/orchestration, CI/CD, observability, reliability |
+| `benjamin-bloom`    | Benjamin Bloom + John Sweller + Robert Bjork + John Hattie | Curriculum/pedagogy: objectives, mastery, cognitive load, durable learning, effect sizes |
 
 Multi-persona agents reason as each voice, agree where the voices agree, and
 **name and resolve the tension** where they'd differ. The TypeScript agents are
@@ -77,7 +78,12 @@ matching persona panel. **Language/ecosystem:** `rails-auditor` (`sandi-metz`),
 `typescript-auditor` (`matt-pocock` base + `dan-abramov`/`ryan-dahl` layers),
 `swift-auditor` (`paul-hudson`), `rust-auditor` (`niko-matsakis`).
 **Cross-cutting** (any codebase): `security-auditor` (`troy-hunt`),
-`design-auditor` (`paula-scher`), `devops-auditor` (`kelsey-hightower`). The
+`design-auditor` (`paula-scher`), `devops-auditor` (`kelsey-hightower`).
+**Pedagogy** (educational products): `curriculum-auditor` (`benjamin-bloom`) —
+audits the *learning design* (objectives, mastery, cognitive load, durable
+learning), not the code; it interviews adaptively up front, gates the
+pedagogical-judgment calls, and applies content/config/sequencing fixes (its
+"verify" is curriculum coherence + educator review, not a test suite). The
 shared loop:
 
 1. **Scope** the project (cheap, on the orchestrator).
