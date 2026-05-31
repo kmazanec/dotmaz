@@ -16,8 +16,10 @@ description: >-
   teaching well", "are our mastery thresholds right", "do we follow learning-science best practices",
   "will learners actually learn / retain this", "review our knowledge components / misconceptions /
   scaffolding". Triggers even if the user doesn't name this skill, as long as they want an educational
-  product's instructional design evaluated. NOT for auditing the code that implements it (use the
-  language auditors) — this audits what is taught and how, not how it's built.
+  product's instructional design evaluated. It audits what is taught and how — not the engine's code
+  quality (that's the language auditors) — but when the pedagogy needs a capability the engine lacks, it
+  detects the stack and dispatches the matching language agent (Sonnet) to build it, then drives it from
+  content/config.
 ---
 
 # Curriculum Auditor
@@ -154,12 +156,36 @@ guessing or interrupting constantly.
   cut extraneous load, replace a low-leverage mechanic with a high-leverage one, fix a prerequisite
   inversion in the sequence.
 - **Most fixes are content / config / sequencing, not code** — editing `content.json`, `mastery_config.json`,
-  `misconceptions.json`, lesson copy, item banks, the KC graph, tutor scripts. Where a pedagogical fix
-  *does* require a code/engine change (e.g. the engine can't space practice across sessions), describe
-  the change and flag it for the engineering auditors / the user rather than hacking the engine here.
-- **Sonnet is the default; Opus is the rare exception** — `model: sonnet` unless a batch genuinely
-  exceeds it (re-architecting a whole lesson's mastery model, redesigning a KC graph). Name *why*; if
-  unsure, it's a Sonnet job.
+  `misconceptions.json`, lesson copy, item banks, the KC graph, tutor scripts. The `benjamin-bloom` fix
+  agents own these directly.
+- **When a pedagogical fix needs an ENGINE capability the engine lacks, close the loop — don't just
+  flag it.** If raising the learning outcome genuinely requires a code change (e.g. the engine can't
+  *space* practice across sessions, can't *interleave* item types, can't gate advancement on mastery,
+  has no hook to surface a misconception, can't record a retrieval attempt), the curriculum auditor
+  **specifies the capability in pedagogical terms and dispatches the matching language agent to
+  implement it** — the curriculum auditor owns the *what & why*, the language agent owns the idiomatic
+  *how*. To do this:
+  1. **Detect the engine's language/stack** from the repo (the same scope signals the language auditors
+     use — `package.json`/`tsconfig` → TypeScript, `Gemfile` → Rails, `pyproject.toml` → Python,
+     `go.mod` → Go, `Cargo.toml` → Rust, `Package.swift`/`*.xcodeproj` → Swift).
+  2. **Pick the matching language agent** and dispatch it on **Sonnet** (`model: sonnet`) with a precise
+     spec: the pedagogical capability needed, the desired behavior, the relevant files/engine seam, and
+     the constraint that it must follow that language's idiom and not change unrelated behavior. The
+     mapping: TypeScript → `matt-pocock` (+ `dan-abramov` if the change is in React UI, `ryan-dahl` if
+     in a Node service); Ruby/Rails → `sandi-metz`; Python → `raymond-hettinger`; Go → `rob-pike`;
+     Rust → `niko-matsakis`; Swift/iOS → `paul-hudson`. (If the engine's language has no agent yet,
+     fall back to a `general-purpose` Sonnet agent with the same spec, and note it.)
+  3. **Keep the boundary clean:** the language agent implements the *capability*; the `benjamin-bloom`
+     agents then use it from the content/config side (e.g. once the engine can space practice, the
+     pedagogy fix sets the spacing schedule in config). Treat the engine change as its own
+     file-ownership batch so it doesn't collide with content edits.
+  Only do this for a capability that genuinely raises the learning outcome and that config/content
+  can't achieve — not to refactor the engine for its own sake (that's the language auditor's job, run
+  separately). A large or risky engine change is still worth gating to the user first (step 4).
+- **Sonnet is the default; Opus is the rare exception** — `model: sonnet` for every fix agent
+  (`benjamin-bloom` and any dispatched language agent) unless a batch genuinely exceeds it
+  (re-architecting a whole lesson's mastery model, redesigning a KC graph, a deep engine change where
+  one wrong move cascades). Name *why*; if unsure, it's a Sonnet job.
 - **Sub-agents do NOT commit**, and they do NOT apply gated judgment-call fixes without the user's
   decision. They edit and report. Tell each what others touch at shared boundaries (a shared KC
   vocabulary, a mastery-config schema); have them report file-by-file.
@@ -179,8 +205,13 @@ pedagogy back to the human:
   KCs.
 - **Mastery configs** are internally consistent and match their schema; thresholds reflect the gated
   decisions.
+- **If an engine capability was implemented this run, it DOES get the code gate** — run the repo's
+  build/typecheck/test for that stack (the same gates the matching language auditor would: `tsc
+  --noEmit`/tests for TS, `bundle exec rspec` for Rails, `cargo test` for Rust, etc.) so the engine
+  change is verified like any code change. The content/config edits that ride on top of it still get
+  only the coherence checks above.
 - If the app can be run, **drive a lesson** (via the `run` skill) to sanity-check that the changed
-  content renders and the flow is coherent for the learner.
+  content renders, the new engine capability behaves, and the flow is coherent for the learner.
 - **Surface the pedagogical changes to the educator for confirmation** — a curriculum change is a
   content/teaching decision; the human owns the final call on whether it teaches *their* learner better.
   The real proof is a downstream learning-outcome measurement (pre/post, retention check), which this
@@ -190,7 +221,8 @@ pedagogy back to the human:
 
 Stage **only the files this session touched** (never `git add -A`). Conventional-commit message (e.g.
 `content(lessons):` / `fix(curriculum):`) describing the pedagogical changes and the learning-science
-rationale. Record gated decisions and any fix deferred to the engine/educator.
+rationale. If an engine capability was added, note it and the language agent that implemented it.
+Record gated decisions and any fix deferred to the educator.
 
 ---
 
@@ -211,9 +243,14 @@ rationale. Record gated decisions and any fix deferred to the engine/educator.
   exposure-first lesson isn't a "broken mastery design"; a single-session app can't be faulted for "no
   spacing across sessions" if spacing isn't in scope. When a finding fights a stated, deliberate
   pedagogical choice, decline it and say so.
-- **Most fixes are content, not code.** The leverage is in the objectives, the items, the misconception
-  list, the mastery thresholds, and the sequence — edit those. Don't reach into the engine unless the
-  pedagogy genuinely requires a capability the engine lacks (and then flag it).
+- **Most fixes are content, not code — but a missing capability gets fixed, not just flagged.** The
+  leverage is usually in the objectives, items, misconception list, mastery thresholds, and sequence —
+  edit those directly. When the pedagogy genuinely needs a capability the engine lacks, don't stop at a
+  note: detect the engine's language, dispatch the matching language agent (Sonnet) with a precise
+  pedagogical spec to build it, then drive the new capability from config/content. The curriculum
+  auditor owns the *what & why*; the language agent owns the idiomatic *how*. Reserve this for
+  capabilities that genuinely raise the learning outcome — don't refactor the engine for its own sake,
+  and gate a large/risky engine change to the user first.
 - **There is no green build for teaching.** Coherence checks and the educator's confirmation are the
   gate; the true verdict is a learning-outcome measurement downstream. Recommend instrumenting it.
 - **Keep the orchestrator's context clean.** Delegate the reading; hold the conclusions and the locked

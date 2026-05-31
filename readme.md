@@ -83,8 +83,10 @@ matching persona panel. **Language/ecosystem:** `rails-auditor` (`sandi-metz`),
 audits the *learning design* (objectives, mastery, cognitive load, durable
 learning), not the code; it interviews adaptively up front, gates the
 pedagogical-judgment calls, and applies content/config/sequencing fixes (its
-"verify" is curriculum coherence + educator review, not a test suite). The
-shared loop:
+"verify" is curriculum coherence + educator review, not a test suite). When a
+pedagogical fix needs a capability the engine lacks, it detects the stack and
+dispatches the matching language agent (Sonnet) to build it, then drives it from
+config. The shared loop:
 
 1. **Scope** the project (cheap, on the orchestrator).
 2. **Audit fan-out** — parallel read-only **Sonnet** sub-agents, one per
