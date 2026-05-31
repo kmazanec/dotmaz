@@ -68,6 +68,34 @@ done
 # Disable dotglob option
 unsetopt dotglob
 
+echo "Linking Claude Code agents and skills"
+
+# Symlink every agent (flat <name>.md) and skill (a directory containing SKILL.md)
+# into ~/.claude/ so Claude Code discovers them. Idempotent: skips anything already linked.
+mkdir -p ~/.claude/agents ~/.claude/skills
+
+for f in $PWD/agents/*.md; do
+  [[ -e $f ]] || continue
+  name=$(basename $f)
+  if [[ -L ~/.claude/agents/$name ]]; then
+    echo "✅ agent $name is already linked"
+  else
+    echo "Linking agent $name"
+    ln -s $f ~/.claude/agents/$name
+  fi
+done
+
+for d in $PWD/skills/*; do
+  [[ -d $d ]] || continue
+  name=$(basename $d)
+  if [[ -L ~/.claude/skills/$name ]]; then
+    echo "✅ skill $name is already linked"
+  else
+    echo "Linking skill $name"
+    ln -s $d ~/.claude/skills/$name
+  fi
+done
+
 echo "Installing Git completion and helpers"
 
 if [ ! -f ~/.git-completion.bash ]; then
