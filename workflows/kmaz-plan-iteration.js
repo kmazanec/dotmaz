@@ -226,41 +226,96 @@ const CONTRACT_SPEC_SCHEMA = {
 
 phase('Scope')
 
-// FIND THE NEXT INCOMPLETE ITERATION (only when the caller didn't name one and
-// we're not in legacy flat mode). A cheap Haiku agent walks docs/iterations/ in
-// order and returns the first iteration directory that is NOT yet done — judged
-// from its feature specs (there is no per-iteration README). This replaces the
-// old hardcoded 'docs/iterations/01-*' default, which always planned iteration 1
-// even after it shipped.
+// FIND THE NEXT UNBUILT ITERATION. The user never passes the iteration — this
+// finder IS the resolver, so it must be RIGHT, and it must REFUSE rather than
+// guess, because the Persist phase writes onto whatever it returns (it once
+// planned over an already-shipped iteration twice).
+//
+// The old heuristic ("every spec has a ### Build outcome + all boxes ticked")
+// was too fragile: shipped iterations don't always carry that exact string, and
+// DEFERRED-but-shipped boxes stay unticked — so it kept nominating shipped work.
+// The reliable signals, in priority order, are what the build ACTUALLY leaves
+// behind: STATUS.md (authoritative when present) > git history (a shipped
+// iteration has build/<slug>+integration/<slug> branches and/or its features
+// merged to the default branch) > BUILD-PLAN-<slug>.md presence/status > spec
+// markers. The finder reads them in that order and STOPS on ambiguity.
 if (!ITERATION_DIR && !LEGACY) {
   const finder = await agent(
-    `Find the NEXT INCOMPLETE iteration to plan. Read-only — do NOT write anything.
+    `Resolve the NEXT UNBUILT iteration to plan. Read-only — do NOT write anything. Whatever you return will be PLANNED OVER (its spec files written into), so it is critical you do NOT pick an iteration that is already built or shipped. When in doubt, STOP (set ambiguous=true) rather than guess.
 
-List \`docs/iterations/\` in numeric order (01-, 02-, ...). Iteration dirs hold ONLY feature specs (NN-<slug>.md) — there is no README. For each dir, decide if it is DONE from its feature specs: an iteration is DONE when every feature spec has a "## Build plan (approved)" section with all checkboxes ticked AND a "### Build outcome" note marking it shipped. An iteration is NOT done if any spec has no build plan yet, unticked boxes, or no shipped build-outcome. (A \`BUILD-PLAN-<slug>.md\` in the dir whose Status is "Approved" but whose specs aren't all shipped means it's planned-but-building — also not done.)
+Determine, for each iteration dir under \`docs/iterations/\` (in numeric order 01-, 02-, ...), whether it is ALREADY BUILT, using these signals in PRIORITY ORDER — a higher signal overrides a lower one:
 
-Return the FIRST iteration dir (in numeric order) that is not done — that's the one to plan next. If every iteration looks done, return the highest-numbered one and set allDone=true (the human likely wants to add a new iteration). If \`docs/iterations/\` doesn't exist, set notFound=true.`,
+1. \`docs/STATUS.md\` (authoritative if it exists): read it. It lists each iteration's status (shipped / building / blocked / not started). Trust it over everything below.
+2. GIT HISTORY (strong; use the Bash tool): a built iteration leaves traces. Run e.g. \`git branch -a\` and \`git log --all --oneline\` and look, for each iteration's slug, for a \`build/<slug>\` or \`integration/<slug>\` branch, an MR/merge, or its feature commits on the default branch. An iteration whose work is merged into main is BUILT — never plan over it. (If this isn't a git repo or has no history, skip this signal.)
+3. \`BUILD-PLAN-<slug>.md\` inside the iteration dir: its presence means the iteration was at least planned; a Status of "Approved" or anything past it means it is planned-or-built (not a fresh target).
+4. SPEC MARKERS (weakest): a spec carrying a "### Build outcome" note is built; a "## Build plan (approved)" section means at least planned. Treat unticked checkboxes as INCONCLUSIVE on their own (DEFERRED items legitimately stay unticked in shipped iterations) — do not call an iteration "unbuilt" on unticked boxes alone if higher signals say it shipped.
+
+The NEXT UNBUILT iteration is the FIRST one (numeric order) that is NOT built by the above and NOT already fully planned-and-building. Return it.
+
+STOP CONDITIONS (set the flag and return, do NOT pick a target to write over):
+- \`ambiguous=true\` if the signals CONFLICT for your candidate (e.g. git shows it merged but a spec lacks the outcome note), or you cannot confidently tell built from unbuilt. Explain in \`reason\`.
+- \`allDone=true\` if every iteration is already built — the human likely needs to add a new iteration (don't return one to plan over).
+- \`notFound=true\` if \`docs/iterations/\` doesn't exist.`,
     { label: 'find-next-iteration', phase: 'Scope', model: 'haiku', schema: {
       type: 'object',
       required: ['iterationDir'],
       properties: {
-        iterationDir: { type: 'string', description: 'path to the chosen iteration dir, e.g. docs/iterations/03-foo' },
-        reason: { type: 'string', description: 'one line: why this is the next incomplete one' },
-        allDone: { type: 'boolean', description: 'true if every iteration already looks complete' },
+        iterationDir: { type: 'string', description: 'path to the chosen NEXT-UNBUILT iteration dir, e.g. docs/iterations/03-foo (empty if a stop condition fired)' },
+        reason: { type: 'string', description: 'one line: the signals that show this is the next unbuilt one — and which signal decided it' },
+        builtIterations: { type: 'array', items: { type: 'string' }, description: 'the iteration dirs you judged ALREADY BUILT, so the choice is auditable' },
+        ambiguous: { type: 'boolean', description: 'true if signals conflict or you cannot confidently distinguish built from unbuilt — STOP instead of guessing' },
+        allDone: { type: 'boolean', description: 'true if every iteration is already built' },
         notFound: { type: 'boolean', description: 'true if docs/iterations/ does not exist' },
       },
     } },
   )
   if (finder?.notFound) {
-    log('⛔ No docs/iterations/ directory found. Pass iterationDir (current layout) or featuresDir+iteration (legacy flat) explicitly.')
+    log('⛔ No docs/iterations/ directory found. This project may use the legacy flat layout — re-invoke with featuresDir set.')
     return { stopped: true, reason: 'no-iterations-dir' }
   }
+  if (finder?.ambiguous) {
+    log(`⛔ Could not confidently resolve the next unbuilt iteration: ${finder.reason ?? 'signals conflict'}. Refusing to plan over a possibly-built iteration. Built (per the finder): ${(finder.builtIterations ?? []).join(', ') || 'unknown'}. Re-invoke naming the iteration dir to plan.`)
+    return { stopped: true, reason: 'iteration-ambiguous', builtIterations: finder.builtIterations ?? [], finderReason: finder.reason }
+  }
+  if (finder?.allDone) {
+    log(`⛔ Every iteration is already built (${(finder.builtIterations ?? []).join(', ')}). There is no next unbuilt iteration to plan — add a new one to the roadmap first, or name the iteration dir explicitly.`)
+    return { stopped: true, reason: 'all-iterations-built', builtIterations: finder.builtIterations ?? [] }
+  }
+  if (!finder?.iterationDir) {
+    log('⛔ The finder returned no iteration dir and no stop flag — refusing to guess a write target.')
+    return { stopped: true, reason: 'finder-empty' }
+  }
   ITERATION_DIR = finder.iterationDir
-  log(`Next incomplete iteration: ${ITERATION_DIR}${finder?.reason ? ` — ${finder.reason}` : ''}${finder?.allDone ? ' (all iterations look done — planning the latest)' : ''}`)
+  log(`Next unbuilt iteration: ${ITERATION_DIR}${finder?.reason ? ` — ${finder.reason}` : ''}. Already-built (skipped): ${(finder.builtIterations ?? []).join(', ') || 'none'}.`)
 }
-// Fall back to the legacy default sentinel only when truly nothing resolved it
-// (e.g. legacy mode with no dir) so the scope brief's own legacy path handles it.
-if (!ITERATION_DIR && !LEGACY) ITERATION_DIR = 'docs/iterations'
 resolveArtifactPaths()
+
+// SAFETY GUARD (defense in depth): independently confirm the resolved target is
+// NOT already built before any write. The Persist phase writes onto these spec
+// files; planning over a shipped iteration is the failure this guards. A fresh
+// agent (not the finder) re-checks the SAME hard signals; on built/ambiguous it
+// HARD-STOPS. Cheap relative to corrupting shipped specs.
+if (!LEGACY && ITERATION_DIR) {
+  const guard = await agent(
+    `Confirm whether the iteration at \`${ITERATION_DIR}\` is SAFE to plan — i.e. it is NOT already built or shipped. Read-only; do NOT write. The next phase writes plans INTO this dir's spec files, so a wrong "safe" corrupts shipped work — default to UNSAFE when unsure.
+
+Check, in priority order: (1) \`docs/STATUS.md\` if present — does it mark this iteration shipped/built? (2) git history (Bash) — is there a \`build/<slug>\`/\`integration/<slug>\` branch for this iteration, or are its feature commits merged into the default branch? (3) the iteration's specs — do they carry "### Build outcome" notes indicating it shipped? If ANY of these says built/shipped, it is NOT safe.
+
+Return safe=true ONLY if you are confident this iteration has not been built. Otherwise safe=false with the evidence.`,
+    { label: 'guard-not-built', phase: 'Scope', model: 'haiku', schema: {
+      type: 'object',
+      required: ['safe'],
+      properties: {
+        safe: { type: 'boolean', description: 'true ONLY if confident the iteration is not yet built (safe to plan over)' },
+        evidence: { type: 'string', description: 'what you found — the signal that decided it' },
+      },
+    } },
+  )
+  if (!guard?.safe) {
+    log(`⛔ Safety guard refused to plan \`${ITERATION_DIR}\`: it appears already built/shipped. ${guard?.evidence ?? ''} Refusing to write plans onto a built iteration. If this is wrong, name a different iteration dir explicitly.`)
+    return { stopped: true, reason: 'target-already-built', iterationDir: ITERATION_DIR, evidence: guard?.evidence }
+  }
+}
 
 const scopeBrief = `You are scoping the build of ONE roadmap iteration. This is read-only reconnaissance — do NOT write or commit anything.
 
@@ -290,7 +345,7 @@ Then, for EACH feature you'll plan:
 
 Plan ALL the iteration's features — the independent ones AND the hard-dependent ones; do NOT drop a feature for having a hard dep. The build workflow serializes a feature behind its \`dependsOn\` automatically and runs everything else concurrently. Only raise a blocker when a dependency is genuinely MISSING FROM THE CODE, never merely because it builds later.
 
-Populate \`blockers\` with anything that must stop planning and return to the human: a missing dependency, a spec contradicting the code, a cited-but-missing doc. If blockers is non-empty the human will not proceed — be precise.
+Populate \`blockers\` with anything that needs a HUMAN before the build can run autonomously: a missing dependency, a spec contradicting the code, a cited-but-missing doc, OR an open decision only the human can make (an ambiguous acceptance criterion, an unresolved approach choice, a needed key/account, a "confirm X at approval" question). The build runs autonomously and CANNOT ask the human anything — so every such item MUST be a blocker here, NOT a passive "to be confirmed later" note buried in a spec. The orchestrator drains these with the human at approval and records the answers; an approved plan has zero open questions. Be precise — state each blocker as the specific decision or fact needed.
 
 Return the structured scope.`
 
@@ -444,20 +499,42 @@ await parallel(
     return agent(
       `Persist the approved build plan for feature ${plan.featureId} into its spec file \`${feat?.specPath}\`. This section is the SINGLE source of truth for how this feature is built — the orchestration index will link here, not duplicate it.
 
-Append (in or above the spec's "Implementation notes" section) a "## Build plan (approved)" section as a Markdown CHECKBOX list — one \`- [ ]\` item per chunk, in order, each line stating: the chunk title, what it delivers, the acceptance criteria it satisfies, the specific test target(s) that prove it, and its contract touchpoint. Then a "### Test strategy", "### Contract touchpoints" (contract / action / frozen signature), "### Manual setup", and "### Risks" subsection from the plan below.
+FIRST, A SAFETY CHECK: read the spec file. If it ALREADY contains a "### Build outcome" note (it was already built/shipped), do NOT write anything — STOP and report alreadyBuilt=true with the existing outcome line. Planning over a shipped spec corrupts it; refuse. (An existing "## Build plan (approved)" section WITHOUT a build outcome is a re-plan of unbuilt work — that's fine; replace that section in place.)
+
+If safe, append (in or above the spec's "Implementation notes" section) a "## Build plan (approved)" section as a Markdown CHECKBOX list — one \`- [ ]\` item per chunk, in order, each line stating: the chunk title, what it delivers, the acceptance criteria it satisfies, the specific test target(s) that prove it, and its contract touchpoint. Then a "### Test strategy", "### Contract touchpoints" (contract / action / frozen signature), "### Manual setup", and "### Risks" subsection from the plan below.
 
 This is pure transcription of the plan below into Markdown — do NOT summarize, reword, omit, or reorder it, and do NOT alter ANY existing content in the spec (read the file, insert the new section, leave every other byte unchanged).
 
 The plan:
 ${JSON.stringify(plan, null, 2)}
 
-After writing, confirm the file path and the number of checkbox items written.`,
+After writing, confirm the file path and the number of checkbox items written — or, if you refused, report alreadyBuilt=true and what you found.`,
       // Haiku: pure transcription of structured plan JSON into a Markdown section,
-      // inserted into a spec the human reviews at the approval gate. No judgment.
-      { label: `persist:${plan.featureId}`, phase: 'Persist', model: 'haiku' },
+      // inserted into a spec the human reviews at the approval gate. No judgment —
+      // EXCEPT the alreadyBuilt refusal, the last line of defense against planning
+      // over a shipped spec.
+      { label: `persist:${plan.featureId}`, phase: 'Persist', model: 'haiku', schema: {
+        type: 'object',
+        required: ['written'],
+        properties: {
+          written: { type: 'boolean', description: 'true if the build plan section was written; false if refused' },
+          alreadyBuilt: { type: 'boolean', description: 'true if you refused because the spec already has a ### Build outcome (shipped)' },
+          path: { type: 'string' },
+          checkboxItems: { type: 'integer' },
+          note: { type: 'string' },
+        },
+      } },
     )
   }),
-)
+).then((results) => {
+  // If any spec refused as already-built, the target was a shipped iteration that
+  // slipped past the finder + guard — surface it loudly; the human should re-check.
+  const refused = (results ?? []).filter((r) => r && r.alreadyBuilt)
+  if (refused.length) {
+    log(`⚠️ ${refused.length} spec(s) refused to be overwritten because they are already built/shipped — the resolved iteration \`${ITERATION_DIR}\` may be wrong. Review before approving; nothing was committed.`)
+  }
+  return results
+})
 
 // Write the orchestration INDEX the build workflow reads. It links to the
 // per-spec plans rather than duplicating them. Sonnet: this is templating the
@@ -520,7 +597,19 @@ return {
   // the human's verbal approval the ASSISTANT (not the human) edits the plan's
   // Status line to "Approved" and commits it — then STOPS. Launching the build
   // stays user-triggered; do NOT auto-run it.
+  // The orchestrator OWNS getting this plan to a clean Approved state. The build
+  // workflow is autonomous and cannot take input — so it must NEVER be the thing
+  // that surfaces an open question. An Approved plan has ZERO unresolved items:
+  // every blocker AND every open human-decision (anywhere in the manifest or the
+  // per-spec plans) is resolved with the human, the answer recorded into the
+  // plan, BEFORE Status flips to Approved. If the orchestrator flips Approved
+  // with anything still open, the build will refuse and the pipeline is blocked —
+  // which is the orchestrator's failure to finish approval, not a build problem.
   nextStep: _blocked
-    ? `Plan has ${scope.blockers.length} blocker(s) — resolve them with the human BEFORE approving or building. Do NOT flip Status to Approved while blockers stand.`
-    : `Present AND TEACH the plan to the human (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) — the approval gate is a teaching moment, not just a yes/no. Walk them through: WHY the iteration was sliced into these features in this dependency order; which shared contracts got frozen and what each commits the build to; where the real risk concentrates (the riskiest chunks, the convergence-prone contracts); and which features will build concurrently vs. serialize. The human should be able to re-explain the build approach before approving it. THEN, on their verbal approval, edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved" and git-commit just that file (the human does not touch it). Then tell them they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself.`,
+    ? `Plan has ${scope.blockers.length} blocker(s): ${scope.blockers.map((b) => `"${b}"`).join('; ')}. You (the orchestrator) MUST resolve every one with the human now — get their decision, record it into the plan (the relevant spec or the manifest), and remove the blocker. Only when NO blocker remains do you flip Status to Approved. Do NOT flip Approved with blockers standing, and do NOT hand the human a build they'll have to babysit.`
+    : `Present AND TEACH the plan to the human (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) — the approval gate is a teaching moment, not a yes/no. Walk them through: WHY the iteration was sliced into these features in this dependency order; which contracts got frozen and what each commits the build to; where the risk concentrates; which features build concurrently vs. serialize.
+
+CRITICAL — finish approval completely before flipping the status. SCAN the manifest AND every per-spec "Build plan (approved)" section for ANY open human-decision, "confirm at approval", "TBD", or unresolved choice. For EACH, get the human's decision now and RECORD it into the plan (edit the spec/manifest so the decision is locked in writing). The build workflow runs autonomously and CANNOT ask the human anything — so if you leave ANY open item, the build will refuse to start and the human is stuck. An Approved plan has ZERO open questions.
+
+THEN, once everything is resolved and recorded and the human has verbally approved: edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved", clear/confirm the Blockers section reads "None", and git-commit just the plan files you changed (the human does not edit them). THEN tell the human they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself, but the plan you hand off must be one the build can run start-to-finish without asking them a single question.`,
 }
