@@ -27,13 +27,13 @@ correct (the framework auditors own that). It is largely **framework-agnostic** 
 markup, components, and styles (and, ideally, the running UI) regardless of React/Vue/Svelte/Rails
 views/SwiftUI/plain HTML.
 
-> **Run by Adam Wathan & Steve Schoger (with Brad Frost and Paula Scher).** Every audit and fix
-> sub-agent is dispatched as the `adam-wathan` agent so the UI is judged through four design minds:
-> Wathan/Schoger's visual craft (hierarchy, spacing, type, color, depth — Refactoring UI), Frost's
-> design-systems rigor (components, tokens, consistency), and **Paula Scher's bold art-direction voice**
-> (type as hero, fearless scale and color, a point of view that makes a design memorable, not just
-> correct). The orchestrator stays neutral — it scopes, coordinates, drives the running UI for evidence,
-> integrates, and runs the gates.
+> **Run by Paula Scher (with Adam Wathan, Steve Schoger, and Brad Frost).** Every audit and fix
+> sub-agent is dispatched as the `paula-scher` agent so the UI is judged through four design minds:
+> **Scher's bold art-direction voice** (lead — type as hero, fearless scale and color, a point of view
+> that makes a design memorable, not just correct), Wathan/Schoger's visual craft (hierarchy, spacing,
+> type, color, depth — Refactoring UI), and Frost's design-systems rigor (components, tokens,
+> consistency). The orchestrator stays neutral — it scopes, coordinates, drives the running UI for
+> evidence, integrates, and runs the gates.
 
 ## The core loop
 
@@ -67,8 +67,8 @@ findings respect it. A deliberate brand choice is not a finding.
 
 ## 2. Audit fan-out (parallel, read-only, Sonnet)
 
-Dispatch sub-agents **in a single message**, all as the `adam-wathan` agent (`subagent_type:
-adam-wathan`, `model: sonnet`), read-only, one per concern. Give each the relevant components/styles and
+Dispatch sub-agents **in a single message**, all as the `paula-scher` agent (`subagent_type:
+paula-scher`, `model: sonnet`), read-only, one per concern. Give each the relevant components/styles and
 the screenshots:
 
 - **Hierarchy & layout** — is the most important thing the most prominent? size-only hierarchy; loud
@@ -120,7 +120,7 @@ impose a personal aesthetic over a deliberate brand.
 
 > **Batch fixes so that no two parallel agents ever edit the same file.**
 
-- **Run the fix agents as `adam-wathan`** (`subagent_type: adam-wathan`) so changes apply the spacing/
+- **Run the fix agents as `paula-scher`** (`subagent_type: paula-scher`) so changes apply the spacing/
   type/color scale consistently, extract repeated patterns into shared components/tokens, raise contrast
   and add focus states, and add the missing empty/loading/error states.
 - **Sonnet is the default; Opus is the rare exception** — `model: sonnet` unless a batch genuinely

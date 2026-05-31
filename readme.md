@@ -59,7 +59,7 @@ code is judged and refactored through their lens. **Language/ecosystem** panels:
 | Agent               | Persona(s) | For |
 | ------------------- | ---------- | --- |
 | `troy-hunt`         | Troy Hunt + Tanya Janca + Dafydd Stuttard | Security: OWASP, injection, authz, secrets, crypto (defensive) |
-| `adam-wathan`       | Adam Wathan + Steve Schoger + Brad Frost + Paula Scher | Frontend design/UX: hierarchy, spacing, type, color, design systems, art direction, WCAG a11y |
+| `paula-scher`       | Paula Scher + Adam Wathan + Steve Schoger + Brad Frost | Frontend design/UX: art direction, hierarchy, spacing, type, color, design systems, WCAG a11y |
 | `kelsey-hightower`  | Kelsey Hightower + Mitchell Hashimoto + Charity Majors | DevOps/platform: IaC, containers/orchestration, CI/CD, observability, reliability |
 
 Multi-persona agents reason as each voice, agree where the voices agree, and
@@ -77,7 +77,7 @@ matching persona panel. **Language/ecosystem:** `rails-auditor` (`sandi-metz`),
 `typescript-auditor` (`matt-pocock` base + `dan-abramov`/`ryan-dahl` layers),
 `swift-auditor` (`paul-hudson`), `rust-auditor` (`niko-matsakis`).
 **Cross-cutting** (any codebase): `security-auditor` (`troy-hunt`),
-`design-auditor` (`adam-wathan`), `devops-auditor` (`kelsey-hightower`). The
+`design-auditor` (`paula-scher`), `devops-auditor` (`kelsey-hightower`). The
 shared loop:
 
 1. **Scope** the project (cheap, on the orchestrator).
