@@ -48,16 +48,22 @@ its ecosystem so code is judged and refactored through their lens:
 | `sandi-metz`        | Sandi Metz + Aaron Patterson (tenderlove) + Nate Berkopec | Ruby/Rails: object design, framework/internals, performance |
 | `rob-pike`          | Rob Pike + Dave Cheney | Go: idiom, design, concurrency, error handling |
 | `raymond-hettinger` | Raymond Hettinger + Tim Peters + Guido van Rossum | Python: idiomatic style, the Zen, types |
+| `matt-pocock`       | Matt Pocock + Anders Hejlsberg + Ryan Cavanaugh | TypeScript (base): type system + general code quality |
+| `dan-abramov`       | Dan Abramov + Kent C. Dodds | React (layers on TS base): effects, renders, state, hooks, testing, a11y |
+| `ryan-dahl`         | Ryan Dahl + Matteo Collina | Node/backend (layers on TS base): async/errors, event loop, streams, robustness |
 
 Multi-persona agents reason as each voice, agree where the voices agree, and
-**name and resolve the tension** where they'd differ.
+**name and resolve the tension** where they'd differ. The TypeScript agents are
+**layered**: the `matt-pocock` base panel always covers the type system and
+general code quality, and a framework panel (`dan-abramov` for React,
+`ryan-dahl` for Node) adds its lens on top when that stack is detected.
 
 ### Auditor skills (`skills/*-auditor`)
 
-The `rails-auditor`, `go-auditor`, and `python-auditor` skills share one
-**fan-out → consolidate → fix → verify-once** process for auditing and
-refactoring an existing codebase for idiom, design, and best-practice
-violations:
+The `rails-auditor`, `go-auditor`, `python-auditor`, and `typescript-auditor`
+skills share one **fan-out → consolidate → fix → verify-once** process for
+auditing and refactoring an existing codebase for idiom, design, and
+best-practice violations:
 
 1. **Scope** the project (cheap, on the orchestrator).
 2. **Audit fan-out** — parallel read-only **Sonnet** sub-agents, one per
