@@ -40,8 +40,8 @@ YAML frontmatter (`name`, `description`) and a body that becomes the agent's
 system prompt. Identity comes from the `name:` field, not the filename. They are
 symlinked into `~/.claude/agents/` so Claude Code discovers them.
 
-The agents are **expert-persona panels** — each channels famous practitioners of
-its ecosystem so code is judged and refactored through their lens:
+The agents are **expert-persona panels** — each channels famous practitioners so
+code is judged and refactored through their lens. **Language/ecosystem** panels:
 
 | Agent               | Persona(s) | For |
 | ------------------- | ---------- | --- |
@@ -52,6 +52,15 @@ its ecosystem so code is judged and refactored through their lens:
 | `dan-abramov`       | Dan Abramov + Kent C. Dodds | React (layers on TS base): effects, renders, state, hooks, testing, a11y |
 | `ryan-dahl`         | Ryan Dahl + Matteo Collina | Node/backend (layers on TS base): async/errors, event loop, streams, robustness |
 | `paul-hudson`       | Paul Hudson + Chris Lattner + John Sundell | Swift/iOS: idiom, value semantics, concurrency safety, SwiftUI/UIKit, architecture |
+| `niko-matsakis`     | Niko Matsakis + Jon Gjengset + Steve Klabnik | Rust: ownership, safety, `unsafe`, error handling, idiom |
+
+**Cross-cutting** panels — language-agnostic, applicable to any codebase:
+
+| Agent               | Persona(s) | For |
+| ------------------- | ---------- | --- |
+| `troy-hunt`         | Troy Hunt + Tanya Janca + Dafydd Stuttard | Security: OWASP, injection, authz, secrets, crypto (defensive) |
+| `adam-wathan`       | Adam Wathan + Steve Schoger + Brad Frost | Frontend design/UX: hierarchy, spacing, type, color, design systems, WCAG a11y |
+| `kelsey-hightower`  | Kelsey Hightower + Mitchell Hashimoto + Charity Majors | DevOps/platform: IaC, containers/orchestration, CI/CD, observability, reliability |
 
 Multi-persona agents reason as each voice, agree where the voices agree, and
 **name and resolve the tension** where they'd differ. The TypeScript agents are
@@ -61,10 +70,15 @@ general code quality, and a framework panel (`dan-abramov` for React,
 
 ### Auditor skills (`skills/*-auditor`)
 
-The `rails-auditor`, `go-auditor`, `python-auditor`, `typescript-auditor`, and
-`swift-auditor` skills share one **fan-out → consolidate → fix → verify-once**
-process for auditing and refactoring an existing codebase for idiom, design, and
-best-practice violations:
+The auditor skills share one **fan-out → consolidate → fix → verify-once**
+process for auditing and refactoring an existing codebase, each dispatching the
+matching persona panel. **Language/ecosystem:** `rails-auditor` (`sandi-metz`),
+`go-auditor` (`rob-pike`), `python-auditor` (`raymond-hettinger`),
+`typescript-auditor` (`matt-pocock` base + `dan-abramov`/`ryan-dahl` layers),
+`swift-auditor` (`paul-hudson`), `rust-auditor` (`niko-matsakis`).
+**Cross-cutting** (any codebase): `security-auditor` (`troy-hunt`),
+`design-auditor` (`adam-wathan`), `devops-auditor` (`kelsey-hightower`). The
+shared loop:
 
 1. **Scope** the project (cheap, on the orchestrator).
 2. **Audit fan-out** — parallel read-only **Sonnet** sub-agents, one per
@@ -79,11 +93,13 @@ best-practice violations:
    sub-agents never run the suite themselves.
 8. **Commit** only what changed.
 
-Each auditor dispatches its sub-agents as the matching ecosystem agent
-(`rails-auditor` → `sandi-metz`, `go-auditor` → `rob-pike`, `python-auditor` →
-`raymond-hettinger`), so the audit and the refactors are done in the persona's
-voice. The other `kmaz-*` skills form a separate product-build pipeline
-(PRD → architecture → roadmap → plan → build).
+Both the audit and the refactors are done in the persona's voice. Sonnet is the
+default for every sub-agent; Opus is the rare, named exception for a batch that
+genuinely needs it. The cross-cutting auditors run only read-only/dry-run gates
+where they touch sensitive ground — `security-auditor` never weakens a scanner
+to go green, and `devops-auditor` never applies infra (no `apply`/`destroy`),
+leaving those behind explicit human approval. The other `kmaz-*` skills form a
+separate product-build pipeline (PRD → architecture → roadmap → plan → build).
 
 ## Updating
 
