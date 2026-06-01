@@ -96,6 +96,75 @@ for d in $PWD/skills/*; do
   fi
 done
 
+echo "Setting up Codex plugin"
+
+# Codex discovers this repo through the personal plugin marketplace. The repo
+# stays the source of truth; ~/plugins/dotmaz is only a stable local plugin path.
+mkdir -p ~/plugins ~/.agents/plugins
+
+if [[ -L ~/plugins/dotmaz ]]; then
+  current_target="$(readlink ~/plugins/dotmaz)"
+  if [[ "$current_target" == "$PWD" ]]; then
+    echo "✅ Codex plugin path is already linked"
+  else
+    echo "⚠️ ~/plugins/dotmaz points to $current_target; leaving it unchanged"
+  fi
+elif [[ -e ~/plugins/dotmaz ]]; then
+  echo "⚠️ ~/plugins/dotmaz already exists and is not a symlink; leaving it unchanged"
+else
+  echo "Linking Codex plugin path"
+  ln -s "$PWD" ~/plugins/dotmaz
+fi
+
+if [[ ! -f ~/.agents/plugins/marketplace.json ]]; then
+  cat > ~/.agents/plugins/marketplace.json <<'JSON'
+{
+  "name": "personal",
+  "interface": {
+    "displayName": "Personal"
+  },
+  "plugins": []
+}
+JSON
+fi
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home() / ".agents" / "plugins" / "marketplace.json"
+payload = json.loads(path.read_text())
+plugins = payload.setdefault("plugins", [])
+entry = {
+    "name": "dotmaz",
+    "source": {
+        "source": "local",
+        "path": "./plugins/dotmaz",
+    },
+    "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL",
+    },
+    "category": "Developer Tools",
+}
+
+for index, plugin in enumerate(plugins):
+    if isinstance(plugin, dict) and plugin.get("name") == "dotmaz":
+        plugins[index] = entry
+        break
+else:
+    plugins.append(entry)
+
+path.write_text(json.dumps(payload, indent=2) + "\n")
+PY
+
+if command -v codex &> /dev/null; then
+  codex features enable child_agents_md || true
+  codex plugin add dotmaz@personal || true
+else
+  echo "Codex is not installed; skipping Codex plugin install"
+fi
+
 echo "Installing Git completion and helpers"
 
 if [ ! -f ~/.git-completion.bash ]; then

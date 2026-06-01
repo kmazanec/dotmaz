@@ -1,0 +1,22 @@
+{
+  "name": "dotmaz",
+  "version": "0.1.0+codex.20260601030731",
+  "description": "Keith Mazanec local Codex agents and skills",
+  "author": {
+    "name": "Keith Mazanec"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "dotmaz",
+    "shortDescription": "Local Codex agents and skills from dotmaz.",
+    "longDescription": "Version-controlled local Codex skills and agent personas from the dotmaz repository.",
+    "developerName": "Keith Mazanec",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use dotmaz skills and agents for this task."
+    ]
+  }
+}

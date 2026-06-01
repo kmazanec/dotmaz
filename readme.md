@@ -1,9 +1,9 @@
 # dotmaz
 
-Keith's dotfiles, machine setup, and Claude Code configuration — shell config,
-Homebrew bundle, Vim/iTerm/Cursor settings, plus a library of Claude Code
-**agents**, **skills**, and **workflows** that are version-controlled here and
-symlinked into `~/.claude/`.
+Keith's dotfiles, machine setup, Claude Code configuration, and Codex local
+plugin configuration — shell config, Homebrew bundle, Vim/iTerm/Cursor settings,
+plus a library of **agents**, **skills**, and **workflows** that are
+version-controlled here.
 
 ## To run
 
@@ -17,8 +17,8 @@ symlinked into `~/.claude/`.
 `setup.zsh` is idempotent — it installs Homebrew + the `Brewfile`, oh-my-zsh,
 NVM/node/yarn, git helpers, and the Vim plugin manager; symlinks every dotfile
 in `dotfiles/.*` into `~/`; symlinks every agent and skill into `~/.claude/`
-(see below); then runs the SSH, MCP, and Cursor sub-setups. Anything already
-linked is skipped.
+(see below); registers this repo as a local Codex plugin; then runs the SSH,
+MCP, and Cursor sub-setups. Anything already linked is skipped.
 
 ## Layout
 
@@ -26,8 +26,9 @@ linked is skipped.
 | ------------- | ------------- |
 | `dotfiles/`   | Shell + tool config, symlinked into `~/` (`.zshrc`, etc.). |
 | `setup/`      | `setup.zsh` and the SSH / MCP / Cursor sub-setup scripts. |
-| `agents/`     | Claude Code subagent personas (one flat `<name>.md` each). |
-| `skills/`     | Claude Code skills (one directory each, containing `SKILL.md`). |
+| `.codex-plugin/` | Codex plugin manifest for installing this repo as a local plugin. |
+| `agents/`     | Subagent personas (one flat `<name>.md` each). |
+| `skills/`     | Agent skills (one directory each, containing `SKILL.md`). |
 | `workflows/`  | Reusable multi-agent workflow scripts. |
 | `claude/`     | Global Claude instructions (`CLAUDE.md`), symlinked to `~/.claude/CLAUDE.md`. |
 | `utils/`      | Misc helper scripts. |
@@ -68,6 +69,41 @@ Multi-persona agents reason as each voice, agree where the voices agree, and
 **layered**: the `matt-pocock` base panel always covers the type system and
 general code quality, and a framework panel (`dan-abramov` for React,
 `ryan-dahl` for Node) adds its lens on top when that stack is detected.
+
+### Codex plugin and agents
+
+Codex uses this repo through a local personal plugin, not through the Claude
+symlink locations. The repeatable setup is:
+
+1. Keep `.codex-plugin/plugin.json` in this repo. It declares `dotmaz` as a
+   Codex plugin and points Codex at `./skills/`.
+2. Symlink `~/plugins/dotmaz` to this repo. Codex personal marketplace entries
+   resolve `./plugins/<name>` relative to `~/`.
+3. Ensure `~/.agents/plugins/marketplace.json` contains a `dotmaz` entry whose
+   source path is `./plugins/dotmaz`.
+4. Enable the under-development Codex feature flag that reads Markdown child
+   agents:
+
+   ```sh
+   codex features enable child_agents_md
+   ```
+
+5. Install or refresh the plugin:
+
+   ```sh
+   codex plugin add dotmaz@personal
+   ```
+
+`./setup/setup.zsh` performs those steps idempotently when `codex` is installed.
+It intentionally leaves `agents/*.md` as agents, not skills. Do not copy persona
+agents into `skills/`; Codex skill descriptions are capped and skills have a
+different invocation model.
+
+Codex loads plugins, skills, and child-agent metadata at session start. After
+changing `.codex-plugin/plugin.json`, `agents/*.md`, or `skills/*`, reinstall or
+refresh the plugin and then start a new Codex session. For local plugin
+iteration, bump the Codex cachebuster in `.codex-plugin/plugin.json` before
+reinstalling so Codex writes a fresh plugin cache version.
 
 ### Auditor skills (`skills/*-auditor`)
 
@@ -115,3 +151,13 @@ Edit the file in this repo — the `~/.claude/` symlinks point back here, so
 changes take effect on the next Claude Code session (agents and skills are
 discovered at session start). New agents/skills are picked up by re-running
 `./setup/setup.zsh`, which links anything not already linked.
+
+For Codex, edit the file in this repo, run `./setup/setup.zsh` or reinstall
+`dotmaz@personal`, and start a new Codex session. If Codex still does not show
+the persona agents, first check:
+
+```sh
+codex features list | grep child_agents_md
+codex plugin list | grep dotmaz
+find ~/.codex/plugins/cache/personal/dotmaz -maxdepth 5 -path '*/agents/*.md'
+```
