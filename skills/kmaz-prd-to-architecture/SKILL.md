@@ -1,18 +1,11 @@
 ---
 name: kmaz-prd-to-architecture
 description: >-
-  Turn a locked Product Requirements Document (docs/PRD.md, the kind kmaz-prd produces) into a
-  defensible system design: a decision-by-decision walkthrough that teaches the user the tradeoffs,
-  then an ADR-style ARCHITECTURE.md (every decision with its WHY) and a docs/adrs/ directory. The
-  PRD owns WHAT/WHY (behavior, technology-agnostic); this skill owns HOW (the stack, the system
-  shape, every architectural decision). It grounds those decisions in a deep technology/tradeoff
-  research pass via the kmaz-research workflow, reusing any earlier research rather than redoing it.
-  Use this whenever the user has a PRD (or a brief/spec) and wants it turned into an architecture —
-  "design the system", "decide the architecture", "what stack should I use", "walk me through the
-  decisions", "turn this PRD into a design". If a raw brief arrives with no PRD, point the user at
-  kmaz-prd first (the WHAT must be locked before the HOW); only fall back to designing from a raw
-  brief if they explicitly skip the PRD stage. Hands off to kmaz-architecture-to-roadmap once the
-  design is locked. This is the second stage of the build pipeline.
+  Turn a locked PRD into a defensible system architecture. Walk through technology and design tradeoffs,
+  produce ADR-style ARCHITECTURE.md and docs/adrs/, and make every stack/system decision explicit. Use
+  when the user has a PRD, brief, or spec and asks to design the system, choose the stack, decide
+  architecture, or turn requirements into a technical design. Prefer kmaz-prd first when WHAT/WHY is not
+  locked. Hands off to kmaz-architecture-to-roadmap after the design is locked.
 ---
 
 # PRD → Defensible Architecture

@@ -1,20 +1,12 @@
 ---
 name: typescript-auditor
 description: >-
-  Audit a TypeScript codebase for type-safety, idiom, design, and (framework-specific) correctness
-  problems, then fix the findings — by detecting the ecosystem (pure TS / React / Node) during scope,
-  then fanning out read-only Sonnet sub-agents over the project by concern, consolidating their
-  reports into a severity-ranked list, then dispatching fix sub-agents batched by file-ownership so
-  they never collide. The orchestrator keeps its own context clean (delegate, don't read), integrates
-  the results, and runs the typecheck/lint/test/build gates ONCE at the very end — sub-agents never
-  run the suite. The BASE TypeScript panel (type system + general code quality) always runs; framework
-  panels (React, Node) LAYER on top when that stack is detected. Use whenever the user wants to review/
-  audit/clean up/refactor an existing TypeScript project, "find where this isn't type-safe / isn't
-  idiomatic TS", "kill the `any`s", "make illegal states unrepresentable", "audit our React hooks /
-  effects / re-renders", "audit our Node async/error handling/streams", "improve code quality", or
-  otherwise improve a TS codebase's quality without adding a feature. Triggers even if the user doesn't
-  name this skill, as long as they want a TypeScript quality/type/idiom audit or the refactor that
-  follows. NOT for greenfield product planning or adding a new feature.
+  Audit an existing TypeScript codebase for type safety, idiom, design, framework correctness, and code
+  quality, then fix the findings. Detects pure TS, React, and Node concerns; reviews `any`, type models,
+  illegal states, hooks/effects/re-renders, async/error handling, streams, tests, and build health. Use
+  when the user asks to review, audit, clean up, or refactor TypeScript or improve TS/React/Node code
+  quality without adding a feature. Run typecheck/lint/test/build validation after fixes. Not for
+  greenfield planning or adding a feature.
 ---
 
 # TypeScript Auditor

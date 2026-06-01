@@ -1,21 +1,12 @@
 ---
 name: design-auditor
 description: >-
-  Audit a frontend/UI for visual design, UX, design-system consistency, and accessibility quality —
-  then fix it — by fanning out read-only Sonnet sub-agents over the UI by design concern (hierarchy &
-  layout, spacing & typography, color & depth, design-system/component consistency, states, and
-  accessibility/WCAG), consolidating into a severity-ranked list, then dispatching fix sub-agents
-  batched by file-ownership so they never collide. The orchestrator keeps its own context clean
-  (delegate, don't read), integrates the shared token/component changes, drives the running UI for
-  visual evidence, and runs the build/lint/a11y gates ONCE at the end. This is the "is the UI actually
-  GOOD and USABLE" lens — visual quality, design-system consistency, and accessibility — distinct from
-  framework-correctness auditors (which judge whether the render logic is right, not whether it looks or
-  works well). Use whenever the user wants a design/UX/accessibility review, "does this look good /
-  designed", "improve the UI/UX", "audit our design system / spacing / typography / color", "is this
-  accessible / WCAG", "make it look more polished/professional", or otherwise improve how a UI looks and
-  feels. Triggers even if the user doesn't name this skill, as long as they want a UI design/UX/a11y
-  audit or the polish that follows. For reviewing EXISTING UI; to design something new, use a
-  frontend-design skill instead.
+  Audit an existing frontend/UI for visual design, UX, design-system consistency, and accessibility,
+  then fix the findings. Reviews hierarchy, layout, spacing, typography, color, depth, component
+  consistency, interaction states, and WCAG issues; drives the running UI for evidence and validates
+  with build/lint/a11y checks. Use when the user asks whether a UI looks good or usable, wants UI/UX
+  polish, design-system cleanup, spacing/typography/color review, accessibility review, or a more
+  professional interface. For designing a new UI from scratch, use frontend-design instead.
 ---
 
 # Design Auditor

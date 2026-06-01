@@ -1,19 +1,12 @@
 ---
 name: swift-auditor
 description: >-
-  Audit a Swift / iOS (or macOS/watchOS/visionOS) codebase for idiom, safety, concurrency, design, and
-  UI-framework correctness problems, then fix the findings — by detecting whether it's SwiftUI, UIKit,
-  or mixed during scope, then fanning out read-only Sonnet sub-agents over the project by concern,
-  consolidating their reports into a severity-ranked list, then dispatching fix sub-agents batched by
-  file-ownership so they never collide. The orchestrator keeps its own context clean (delegate, don't
-  read), integrates the results, and runs the build/test gates ONCE at the very end — sub-agents never
-  run the suite. Use whenever the user wants to review/audit/clean up/refactor an existing Swift/iOS
-  app, "find where this isn't idiomatic Swift", "kill the force-unwraps / retain cycles", "fix our data
-  races / modernize to async-await and actors", "make illegal states unrepresentable", "audit our
-  SwiftUI state / view identity" or "our UIKit view controllers / memory", "improve code quality", or
-  otherwise improve a Swift codebase's quality without adding a feature. Triggers even if the user
-  doesn't name this skill, as long as they want a Swift/iOS quality/idiom/safety audit or the refactor
-  that follows. NOT for greenfield product planning or adding a new feature.
+  Audit an existing Swift, iOS, macOS, watchOS, or visionOS codebase for idiom, safety, concurrency,
+  design, SwiftUI/UIKit correctness, and code-quality problems, then fix the findings. Use when the user
+  asks to review, audit, clean up, or refactor Swift; remove force unwraps or retain cycles; fix data
+  races; modernize to async/await and actors; improve SwiftUI state/view identity or UIKit controller
+  memory; or make illegal states unrepresentable. Run build/test validation after fixes. Not for
+  greenfield planning or adding a feature.
 ---
 
 # Swift Auditor

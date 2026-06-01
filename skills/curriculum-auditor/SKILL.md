@@ -1,25 +1,14 @@
 ---
 name: curriculum-auditor
 description: >-
-  Audit the PEDAGOGY of an educational product or curriculum — lessons, knowledge components, learning
-  objectives, mastery thresholds, misconceptions, practice, assessments, sequencing, manipulatives,
-  tutor scripts — against learning-science best practice for durable learning outcomes, then propose and
-  apply fixes. It first infers the learner profile and objectives from the artifacts and asks the user
-  ONLY the load-bearing unknowns it can't determine, then fans out read-only Sonnet sub-agents over the
-  curriculum by pedagogical dimension (objectives & assessment alignment, mastery design, cognitive load
-  & scaffolding, durability — spacing/retrieval/interleaving, effect-size leverage, sequencing &
-  prerequisite structure), consolidates findings ranked by learning-outcome impact, gates the
-  pedagogical-judgment calls back to the user, then applies content/config/sequencing fixes batched by
-  ownership. This is a LEARNING-SCIENCE lens, not a code lens — it asks "will a learner actually, durably
-  learn from this?" Use whenever the user wants a pedagogy/curriculum/instructional-design review of an
-  educational app, course, lesson set, or tutor — "audit our curriculum / lessons / pedagogy", "is this
-  teaching well", "are our mastery thresholds right", "do we follow learning-science best practices",
-  "will learners actually learn / retain this", "review our knowledge components / misconceptions /
-  scaffolding". Triggers even if the user doesn't name this skill, as long as they want an educational
-  product's instructional design evaluated. It audits what is taught and how — not the engine's code
-  quality (that's the language auditors) — but when the pedagogy needs a capability the engine lacks, it
-  detects the stack and dispatches the matching language agent (Sonnet) to build it, then drives it from
-  content/config.
+  Audit the pedagogy of an educational product, course, lesson set, curriculum, or tutor against
+  learning-science best practices, then propose and apply fixes. Reviews objectives, knowledge
+  components, mastery thresholds, misconceptions, practice, assessments, sequencing, scaffolding,
+  retrieval, spacing, interleaving, cognitive load, and tutor scripts. Use when the user asks to audit
+  curriculum, lessons, pedagogy, instructional design, mastery thresholds, misconceptions, scaffolding,
+  retention, or whether learners will actually learn. This is a learning-science lens, not a code-quality
+  lens; if a pedagogy fix requires engine work, detect the stack and use the matching implementation
+  agent.
 ---
 
 # Curriculum Auditor

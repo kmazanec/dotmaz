@@ -1,19 +1,11 @@
 ---
 name: rails-auditor
 description: >-
-  Audit a Rails codebase for convention/SOLID/best-practice violations, then fix the findings —
-  by fanning out read-only Sonnet sub-agents over the app layer-by-layer (models, controllers/routes,
-  service objects, jobs, views/helpers, config), consolidating their reports into a severity-ranked
-  list, then dispatching fix sub-agents batched by file-ownership so they never collide. The
-  orchestrator keeps its own context clean (delegate, don't read), integrates the results, applies
-  cross-cutting one-liners itself, and runs the test/lint/security gates ONCE at the very end —
-  sub-agents never run specs. Use whenever the user wants to review/audit/clean up/refactor an
-  existing Rails app, "find where we don't follow Rails conventions", "audit the models/controllers/
-  services", "improve code quality", "are our controllers thin / scopes used / tests over-mocked /
-  do we follow SOLID", or otherwise improve an existing Rails codebase's quality without adding a
-  feature. Triggers even if the user doesn't name this skill, as long as they want a Rails
-  quality/convention audit or the refactor that follows from one. NOT for greenfield product
-  planning (that's the kmaz pipeline) or adding a new feature (that's kmaz-feature).
+  Audit an existing Rails app for convention, SOLID, best-practice, layer, and correctness problems,
+  then fix the findings. Reviews models, controllers/routes, service objects, jobs, views/helpers,
+  config, scopes, tests, and Rails idiom. Use when the user asks to review, audit, clean up, or refactor
+  Rails; find convention violations; thin controllers; improve code quality; or check over-mocked tests.
+  Run test/lint/security validation after fixes. Not for greenfield product planning or adding a feature.
 ---
 
 # Rails Auditor

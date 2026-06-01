@@ -1,19 +1,11 @@
 ---
 name: go-auditor
 description: >-
-  Audit a Go codebase for idiom, design, concurrency, and correctness problems, then fix the
-  findings — by fanning out read-only Sonnet sub-agents over the project package-by-package (and
-  concern-by-concern: APIs/interfaces, error handling, concurrency, the cmd/ and main wiring,
-  tests), consolidating their reports into a severity-ranked list, then dispatching fix sub-agents
-  batched by file/package-ownership so they never collide. The orchestrator keeps its own context
-  clean (delegate, don't read), integrates the results, and runs the build/vet/race/test gates ONCE
-  at the very end — sub-agents never run the test suite. Use whenever the user wants to review/audit/
-  clean up/refactor an existing Go project, "find where this isn't idiomatic Go", "audit the
-  packages/interfaces/error handling/concurrency", "improve code quality", "are our errors handled /
-  goroutines leaking / interfaces too big / packages well-named", or otherwise improve a Go
-  codebase's quality without adding a feature. Triggers even if the user doesn't name this skill, as
-  long as they want a Go idiom/quality audit or the refactor that follows from one. NOT for greenfield
-  product planning or adding a new feature.
+  Audit an existing Go codebase for idiom, design, concurrency, error handling, package structure, API
+  shape, tests, and correctness problems, then fix the findings. Use when the user asks to review,
+  audit, clean up, or refactor Go; find non-idiomatic code; check interfaces, goroutines, errors,
+  package names, cmd/main wiring, or code quality. Run build/vet/race/test validation after fixes. Not
+  for greenfield product planning or adding a new feature.
 ---
 
 # Go Auditor

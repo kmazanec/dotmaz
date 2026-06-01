@@ -1,20 +1,12 @@
 ---
 name: kmaz-feature
 description: >-
-  Add ONE feature to an existing (brownfield) project, end to end, by running the whole kmaz
-  pipeline compressed into a single skill: take the idea, ask immediate scope-clarifying questions,
-  fan out Sonnet sub-agents to study the codebase and research what's needed, then drill the user
-  until the requirements, architecture decisions, and anything needing human judgment are locked —
-  the one human gate. Write a single feature plan doc to docs/, then implement the feature
-  autonomously to completion: make reasonable assumptions without asking, defer only what genuinely
-  cannot be decided or done by the model, and record every assumption, decision, and blocker at the
-  end of the doc to report back. Use this whenever the user wants to add/build/implement a feature,
-  capability, endpoint, screen, or change to an EXISTING project — "add X", "build a feature that
-  does Y", "implement Z in this app", "I have an idea for a feature". This is the single-feature
-  sibling of the iteration pipeline (kmaz-plan-iteration / kmaz-build-iteration); use it for one
-  feature on an existing codebase, not for planning a whole greenfield product (that's kmaz-prd →
-  kmaz-prd-to-architecture → kmaz-architecture-to-roadmap). Trigger even if the user doesn't name
-  this skill, as long as there's a feature to add to a project that already exists.
+  Add one feature to an existing project end to end using a compressed kmaz pipeline: clarify scope,
+  study the codebase, lock requirements and architecture decisions with one human gate, write a feature
+  plan under docs/, implement autonomously, validate, and record assumptions, decisions, and blockers.
+  Use when the user asks to add, build, or implement a feature, capability, endpoint, screen, or change
+  in an existing codebase. Not for whole-product greenfield planning; use kmaz-prd, kmaz-prd-to-architecture,
+  and kmaz-architecture-to-roadmap for that.
 ---
 
 # kmaz-feature — the whole pipeline, in miniature, for one feature

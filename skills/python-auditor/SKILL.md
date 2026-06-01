@@ -1,19 +1,11 @@
 ---
 name: python-auditor
 description: >-
-  Audit a Python codebase for idiom, design, typing, and correctness problems, then fix the findings
-  — by fanning out read-only Sonnet sub-agents over the project package-by-package (and
-  concern-by-concern: public API & types, idiomatic shape, error handling & resources, structure/
-  imports, tests), consolidating their reports into a severity-ranked list, then dispatching fix
-  sub-agents batched by file/module-ownership so they never collide. The orchestrator keeps its own
-  context clean (delegate, don't read), integrates the results, and runs the format/lint/type/test
-  gates ONCE at the very end — sub-agents never run the test suite. Use whenever the user wants to
-  review/audit/clean up/refactor an existing Python project, "find where this isn't Pythonic", "make
-  it more idiomatic", "audit the modules/types/error handling", "improve code quality", "are our
-  type hints good / are we using the stdlib / any mutable-default or bare-except bugs", or otherwise
-  improve a Python codebase's quality without adding a feature. Triggers even if the user doesn't name
-  this skill, as long as they want a Python idiom/quality audit or the refactor that follows from one.
-  NOT for greenfield product planning or adding a new feature.
+  Audit an existing Python codebase for idiom, design, typing, public APIs, structure/imports, error
+  handling, resource handling, tests, and correctness problems, then fix the findings. Use when the
+  user asks to review, audit, clean up, or refactor Python; find non-Pythonic code; improve type hints;
+  check stdlib usage, mutable defaults, bare excepts, modules, or code quality. Run format/lint/type/test
+  validation after fixes. Not for greenfield product planning or adding a new feature.
 ---
 
 # Python Auditor

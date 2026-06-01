@@ -1,17 +1,11 @@
 ---
 name: kmaz-architecture-to-roadmap
 description: >-
-  Decompose an architecture/design document (and the PRD behind it) into an iterative roadmap a
-  team can ship against. Iterations are the TOP-LEVEL unit of the plan; features are nested inside
-  them. Output is a ROADMAP.md (the master artifact: the iteration arc, per-feature hard-dependency
-  edges, and the cross-cutting contracts table) plus a docs/iterations/NN-name/ directory per
-  iteration containing an iteration overview and its nested vertical-slice feature specs. Every
-  feature is a chunk of new user-observable functionality, sized so that after every merge the
-  system is more capable and still shippable. Use whenever the user has an architecture/design/spec
-  and wants it turned into buildable work — "turn this into a roadmap", "break this into
-  iterations/features", "plan the build", "decompose this for a team". This is the third stage of
-  the build pipeline; its per-iteration output is exactly what kmaz-plan-iteration consumes. Trigger
-  even when the user doesn't say "roadmap", as long as they have a design and want a delivery plan.
+  Decompose an architecture/design document and its PRD into an iterative, shippable roadmap. Produces
+  ROADMAP.md plus docs/iterations/NN-name/ plans with iteration overviews and nested vertical-slice
+  feature specs. Use when the user has an architecture, design, or spec and wants buildable work:
+  roadmap, iterations, feature breakdown, delivery plan, or team implementation plan. This is the third
+  kmaz pipeline stage after PRD and architecture; its iteration output feeds kmaz-plan-iteration.
 ---
 
 # Architecture → Iterative Roadmap (iterations as the top-level unit)

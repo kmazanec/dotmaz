@@ -1,19 +1,11 @@
 ---
 name: kmaz-prd
 description: >-
-  Turn scattered thinking — or nothing but a vague problem — into a crystal-clear, executable
-  Product Requirements Document through a senior-PM-style interview. Unlike a brief-driven flow,
-  this assumes requirements are NOT well-defined up front: it listens to whatever the user has
-  (a brief, a half-formed idea, or just a problem), then interrogates in focused rounds until the
-  problem, intent, scope, and constraints are locked, optionally grounding its questions in a
-  parallel research fan-out (the kmaz-research workflow) so it asks informed questions. Produces
-  docs/PRD.md — a numbered, technology-agnostic, behavior-focused spec a coding agent can execute
-  against. Use this as the FIRST stage of the build pipeline whenever the user has a new
-  product/feature idea, a problem to solve, a brief/RFP/take-home, or just wants to "figure out
-  what we're building" — phrases like "I have an idea", "here's a problem", "help me spec this
-  out", "write a PRD", "what should we build", "let's scope this". Hands off to
-  kmaz-prd-to-architecture once the PRD is locked. Trigger even when the user has no brief at all
-  — the whole point is to handle the from-nothing case.
+  Turn a vague problem, idea, brief, RFP, take-home, or scattered thinking into an executable Product
+  Requirements Document through a senior-PM-style interview. Produces docs/PRD.md: a numbered,
+  technology-agnostic, behavior-focused spec a coding agent can execute. Use as the first kmaz pipeline
+  stage when the user wants to figure out what to build, scope an idea, write a PRD, define requirements,
+  or lock product intent and constraints. Hands off to kmaz-prd-to-architecture once the PRD is locked.
 ---
 
 # Brief-or-Nothing → Product Requirements Document

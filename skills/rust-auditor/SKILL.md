@@ -1,19 +1,11 @@
 ---
 name: rust-auditor
 description: >-
-  Audit a Rust codebase for ownership, safety, idiom, and design problems, then fix the findings — by
-  fanning out read-only Sonnet sub-agents over the project crate-by-crate (and concern-by-concern:
-  panics & error handling, ownership & allocation, unsafe & soundness, lifetimes & traits, concurrency
-  & async, idiom & API design), consolidating their reports into a severity-ranked list, then
-  dispatching fix sub-agents batched by file/module-ownership so they never collide. The orchestrator
-  keeps its own context clean (delegate, don't read), integrates the results, and runs the
-  build/clippy/test gates ONCE at the very end — sub-agents never run the suite. Use whenever the user
-  wants to review/audit/clean up/refactor an existing Rust project, "find where this isn't idiomatic
-  Rust", "kill the unwraps / unnecessary clones", "is our unsafe sound", "fix our error handling /
-  Send-Sync / async", "make illegal states unrepresentable", "improve code quality", or otherwise
-  improve a Rust codebase's quality without adding a feature. Triggers even if the user doesn't name
-  this skill, as long as they want a Rust idiom/safety/quality audit or the refactor that follows. NOT
-  for greenfield product planning or adding a new feature.
+  Audit an existing Rust codebase for ownership, safety, idiom, API design, allocation, lifetimes,
+  traits, concurrency/async, error handling, unsafe soundness, panics, and correctness problems, then fix
+  the findings. Use when the user asks to review, audit, clean up, or refactor Rust; remove unwraps or
+  unnecessary clones; check unsafe, Send/Sync, async, or illegal states; or improve code quality. Run
+  build/clippy/test validation after fixes. Not for greenfield planning or adding a feature.
 ---
 
 # Rust Auditor

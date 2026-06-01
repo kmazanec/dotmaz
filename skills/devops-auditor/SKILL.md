@@ -1,21 +1,12 @@
 ---
 name: devops-auditor
 description: >-
-  Audit a project's infrastructure and platform concerns — IaC, containers/orchestration, CI/CD,
-  secrets/config, observability, and reliability — then fix the findings, by fanning out read-only
-  Sonnet sub-agents over the project by platform concern (IaC hygiene & secrets, containers &
-  orchestration, CI/CD pipelines, observability, reliability & failure modes, cloud security posture),
-  consolidating into a list ranked by reliability/security blast radius, then dispatching fix sub-agents
-  batched by file-ownership so they never collide. The orchestrator keeps its own context clean
-  (delegate, don't read), integrates the shared module/config changes, and runs the validate/lint/plan
-  gates ONCE at the end — sub-agents never apply infra. This is the platform/operations lens, distinct
-  from the application-code auditors. Use whenever the user wants an infra/DevOps/platform review,
-  "audit our Terraform / Dockerfiles / Kubernetes / CI", "are our secrets safe / IAM too broad", "is
-  this observable / do we have SLOs", "will this survive prod / graceful shutdown / health checks",
-  "review our deploy pipeline", or otherwise improve infrastructure quality, reliability, or operability.
-  Triggers even if the user doesn't name this skill, as long as they want an infra/platform audit or the
-  hardening that follows. Reviews and proposes fixes for IaC/config — it NEVER applies destructive infra
-  changes; those stay behind explicit human approval.
+  Audit infrastructure and platform concerns, then fix safe code/config findings. Covers IaC,
+  containers, orchestration, CI/CD, secrets/config, observability, reliability, failure modes, and cloud
+  security posture. Use when the user asks to audit Terraform, Dockerfiles, Kubernetes, CI, deployment
+  pipelines, IAM/secrets, SLOs, health checks, graceful shutdown, production readiness, or platform
+  operability. This is the platform/operations lens, distinct from application-code auditors. Never apply
+  destructive infrastructure changes; keep those behind explicit human approval.
 ---
 
 # DevOps / Platform Auditor

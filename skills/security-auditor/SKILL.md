@@ -1,21 +1,12 @@
 ---
 name: security-auditor
 description: >-
-  Audit any codebase, in any language, for security vulnerabilities — then fix them — by tracing
-  untrusted input from source to sink and fanning out read-only Sonnet sub-agents over the project by
-  vulnerability class (injection, access control, auth/sessions, secrets/crypto, web/XSS-CSRF-SSRF,
-  data handling/deserialization, dependencies/config), consolidating into a list ranked by
-  exploitability × impact, then dispatching fix sub-agents batched by file-ownership so they never
-  collide. The orchestrator keeps its own context clean (delegate, don't read), integrates the
-  class-level fixes, and runs the build/test/secret-scan gates ONCE at the end — sub-agents never run
-  the suite. This is a cross-cutting, language-agnostic DEFENSIVE security review that complements (and
-  goes deeper than) the lighter security pass each language auditor does. Use whenever the user wants a
-  security review/audit/pentest-style pass, "find vulnerabilities", "are we injectable / is our authz
-  broken / any secrets in the repo / SSRF / XSS / insecure deserialization", "OWASP audit", "harden
-  this before launch", or otherwise improve a codebase's security posture. Triggers even if the user
-  doesn't name this skill, as long as they want a security audit or the hardening that follows. For
-  authorized defensive review of your own code — not for producing exploits to use against systems you
-  don't own.
+  Audit a codebase in any language for defensive security vulnerabilities, then fix confirmed findings.
+  Traces untrusted input from source to sink and reviews injection, access control, auth/sessions,
+  secrets/crypto, XSS, CSRF, SSRF, deserialization, data handling, dependencies, and config. Use when
+  the user asks for a security review, vulnerability audit, OWASP-style pass, authz check, secret scan,
+  hardening before launch, or similar authorized review of their own code. Not for producing exploits
+  against systems the user does not own.
 ---
 
 # Security Auditor
