@@ -70,9 +70,41 @@ serializes the build).
 
 Good decomposition **minimizes hard dependencies** so the build runs more concurrently — but a
 genuinely linear chain is fine; declare it honestly and let it serialize. Don't contort the slicing
-to manufacture concurrency that isn't there. **Across iterations**, call out which iterations are
-independent (no cross-iteration hard dep) so the human can plan/build them concurrently — that
-cross-iteration parallelism is the biggest speedup for a large product.
+to manufacture concurrency that isn't there.
+
+**Across iterations — make independent iterations buildable as ONE batch.** Call out which iterations
+are independent (no cross-iteration hard dep). But go further than "they *can* build concurrently":
+the build stage runs ONE shared-contract barrier per build invocation, then fans every feature out in
+parallel. So building independent iterations *together, in one invocation* is strictly cheaper than
+building them separately-but-concurrently — one barrier instead of N, and ALL their features fan out
+at once instead of each iteration's features only fanning out within their own build. Concretely: if
+iterations 02 and 03 are mutually independent and each hard-depends only on already-shipped work, say
+so explicitly **and recommend they be planned/built as a single batch** — the wall-clock is then
+`one barrier + the slowest single feature`, not `(barrier + iteration-02) then (barrier + iteration-03)`.
+
+This is why **an iteration boundary is a PRODUCT/SHIPPING unit, not a build-batching unit.** Carve
+iterations by "what coherent capability ships together / what the human wants to review as a unit" —
+but where that product boundary splits a set of *mutually independent, already-unblocked* features
+across iterations, flag that the **build** can collapse them into one batch even though the
+**roadmap** keeps them as separate themed milestones. The biggest single speedup for a large product
+is paying the contract barrier once over the widest independent feature set, not once per theme.
+
+A common failure to avoid: slicing iterations purely by priority tier (P0 / P1 / P2) when the P1 and
+P2 work is mutually independent and both only build on shipped P0. That theme split forces two
+barriers and serializes two builds that could have been one parallel batch. Keep the tiers as the
+*narrative*, but mark the independent set as one build batch.
+
+**Making the batch ACTIONABLE with today's plan/build workflows.** The plan and build stages each
+consume ONE iteration directory (one `BUILD-PLAN-<slug>.md`), so "build these two iterations as one
+batch" only runs if they ARE one iteration dir. So when a set of features is mutually independent and
+unblocked, prefer to put them in **one iteration directory** to begin with — that dir IS the build
+batch — and express the product-theme distinction as *grouping within* it (the feature specs and the
+roadmap narrative can still label which are P1 vs P2). Reserve a *separate* iteration dir for work
+that genuinely must ship/serialize after another iteration (a real cross-iteration hard dep). In
+short: **let the dependency graph decide the iteration DIRECTORIES, and let the product theme decide
+how you narrate and group the features inside them** — don't split an independent feature set into
+separate directories just because the features belong to different product tiers, because the
+directory split is what forces the extra barrier and the lost fan-out.
 
 ## The vertical-slice discipline (features as the unit of progress within an iteration)
 
@@ -262,18 +294,24 @@ current at each convergence; you seed it with everything "not started":
 <one line: nothing built yet — next up is iteration 01.>
 
 ## Iterations
-| # | Iteration | Status | Notes |
-|---|-----------|--------|-------|
-| 01 | <name> | Not started | |
-| 02 | <name> | Not started | (independent of 01 — can build concurrently) |
+| # | Iteration | Status | Build batch | Notes |
+|---|-----------|--------|-------------|-------|
+| 01 | <name> | Not started | A | |
+| 02 | <name> | Not started | B | (independent of 01 & 03 — build with 03 as one batch) |
+| 03 | <name> | Not started | B | (independent of 01 & 02 — build with 02 as one batch) |
 ...
 
 ## What's next
-The immediate next action (e.g. "run kmaz-plan-iteration on docs/iterations/01-<slug>/").
+The immediate next action (e.g. "run kmaz-plan-iteration on docs/iterations/01-<slug>/"). When the
+next actionable work is a batch of mutually-independent iterations, say so: "iterations 02 and 03 are
+independent and only build on shipped 01 — plan/build them as ONE batch (one contract barrier, all
+features fan out)."
 ```
 
-Keep it terse — it's a status, not a second roadmap. Mark which iterations are independent (can run
-concurrently) so the re-entry reader sees the parallelism at a glance.
+Keep it terse — it's a status, not a second roadmap. The **Build batch** column groups iterations
+that are mutually independent and unblocked into one buildable set (same letter = build together):
+the re-entry reader sees not just "these can run concurrently" but "these should be built as one
+batch" — one contract barrier over the widest independent set, maximum feature fan-out.
 
 ### Step 9 — Write each iteration's feature specs
 
@@ -385,12 +423,15 @@ for approval exactly as the plan stage prescribes — the human's review gate is
 extra command invocation is removed. If the hook isn't available, just tell them the exact command to
 run. Do NOT chain past the approval gate, and do NOT auto-run the build — those stay user-triggered.
 
-**Name the concurrent iterations.** Per CONVENTIONS.md, cross-iteration parallelism is the biggest
-speedup for a large product, but the human has to drive it. In the handoff, explicitly call out
-which iterations are INDEPENDENT (no cross-iteration hard dep between them) and can therefore be
-planned and built CONCURRENTLY — e.g. "iterations 2 and 3 don't depend on each other; once iteration
-1's contracts are frozen you can run both in parallel (each is slug-scoped, so they won't collide)."
-Don't make the user infer the concurrency from the dependency graph — hand it to them.
+**Name the build batches.** Per CONVENTIONS.md, paying the contract barrier once over the widest
+independent feature set is the biggest speedup for a large product, but the human has to drive it. In
+the handoff, explicitly call out which iterations are INDEPENDENT (no cross-iteration hard dep between
+them) and recommend they be planned/built as ONE BATCH, not just "concurrently" — e.g. "iterations 2
+and 3 don't depend on each other and only build on shipped iteration 1; build them as one batch so the
+contract barrier runs once and all their features fan out in parallel, rather than two separate builds
+each paying their own barrier." Building independent iterations together is strictly cheaper than
+building them separately-but-concurrently. Don't make the user infer this from the dependency graph —
+hand them the batch grouping.
 
 ## Notes on judgment
 

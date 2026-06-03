@@ -131,10 +131,17 @@ four levels — push each as far as the dependencies allow, no further:
    satisfied concurrently, each in its own worktree. No lanes are planned; concurrency is
    *derived* from the dependency graph (below).
 3. **Iterations** — independent iterations (no cross-iteration hard dep, or only a frozen
-   contract between them) can be planned and built CONCURRENTLY. Every artifact is slug-scoped
-   so they never collide. This is the highest-leverage parallelism for a large product — when
-   two iterations don't depend on each other, plan/build them at the same time, don't queue
-   them.
+   contract between them) can be planned and built CONCURRENTLY, and better still built as ONE
+   BATCH. The build runs ONE contract barrier per invocation, then fans every feature out in
+   parallel — so building an independent set *together in one invocation* is strictly cheaper
+   than building the iterations separately-but-concurrently (one barrier instead of N, and all
+   their features fan out at once). The wall-clock becomes `one barrier + the slowest single
+   feature`, not `barrier+iterA then barrier+iterB`. This is the highest-leverage parallelism
+   for a large product. An iteration boundary is a PRODUCT/shipping unit; where the product theme
+   splits a mutually-independent, already-unblocked feature set across iterations, the BUILD
+   should collapse them into one batch (in practice: put that independent set in one iteration
+   DIRECTORY, since the dir is the build unit, and let the theme just group the features inside).
+   Don't pay the barrier once per theme when one barrier covers the whole independent set.
 4. **Interactive overlap** — in the interview stages, kick off research while you keep
    listening/drafting, so findings are in hand before they're needed rather than blocking on a
    serial research-then-interview sequence.
