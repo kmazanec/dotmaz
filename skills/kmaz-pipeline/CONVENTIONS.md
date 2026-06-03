@@ -81,6 +81,40 @@ Opus is the expensive, scarce resource — spend it only where reasoning earns i
 step on Opus is waste; a reasoning step on Sonnet is a quality risk. Most of the pipeline is
 Sonnet, with Opus at the reasoning cores and Haiku at the extraction edges.
 
+**Specialist routing is orthogonal to the model tier.** The tier (Opus/Sonnet/Haiku) decides *how
+much reasoning* a step gets; the agent **type** decides *whose taste* it carries. The build stage
+routes a feature's implementer and reviewer to the persona agent matching the feature's stack
+(`raymond-hettinger` for Python, `dan-abramov`/`matt-pocock` for React/TS, `sandi-metz` for Ruby,
+`rob-pike` for Go, `niko-matsakis` for Rust, …) — the builder on the Sonnet tier, the reviewer on
+the Opus tier, and ideally a **different** specialist reviewing than built, so the diff gets a
+second domain voice. The plan stage tags each feature with a `stack`; an untagged feature falls
+back to a generic Sonnet build / Opus review. Routing adds domain idiom without changing the tier:
+a specialist builder is still Sonnet, a specialist reviewer is still Opus.
+
+**The build cost is the tool-loop, not the model.** The dominant token cost of a build agent is the
+agentic round-trip — every test run and every commit re-feeds the agent's whole context — not the
+model's reasoning. So build agents work in **batches**: implement a whole chunk, run its impacted
+tests *once*, commit *once* per chunk; drive the running app *once* at the end, not per chunk. Same
+test-first discipline, an order of magnitude fewer round-trips. A fine-grained run-after-every-edit
+loop is the single biggest avoidable token sink in the pipeline.
+
+**The multi-draft planning panel is the most expensive plan-phase step — reserve it.** A
+feature that escalates to the 3-independent-drafts-plus-synth panel costs ~4× a single-pass plan, so
+it fires RARELY and only where draft *diversity* genuinely earns it. The gate is two conditions, both
+required (a forced run aside): the scope pass flagged it high-uncertainty with a concrete reason, AND
+the feature actually **introduces a load-bearing shared contract** — the objective signal that its
+approach is open. A feature that merely *feels* tricky but introduces no contract takes the single
+pass. In practice that's one or two foundational slices per iteration (the skeleton that freezes the
+shared shapes), not every feature an optimistic scope pass flagged.
+
+**Plan agents read narrowly, not the whole architecture.** ~10 planning agents each re-reading the
+full PRD/ARCHITECTURE/ADR corpus cold is a large, avoidable re-ingestion cost. The scope pass already
+identifies which contracts bind each feature (and where each lives) and which features it hard-depends
+on; each planner is handed that targeted reading brief and reads ONLY its spec, the specific
+source-of-truth ADRs that bind it, and the implemented code of its named dependencies — not the whole
+tree. (The reuse/researcher lens keeps repo-search latitude; that ranging IS its job.) Anything a spec
+cites outside the brief is noted as a risk, not chased through the entire corpus.
+
 ## Concurrency — exploit it at every level, derive it from dependencies
 
 Run independent work in parallel wherever the level allows it. The pipeline parallelizes at
@@ -108,6 +142,18 @@ runs everything else concurrently. A **hard dependency** forces order; a **contr
 soft dependency** does NOT (it builds against a frozen contract — see Contracts). Minimize hard
 deps in decomposition; a genuinely linear chain is fine — declare it honestly and let it
 serialize. Don't contort slicing to manufacture concurrency that isn't there.
+
+**Over-declaring `dependsOn` is the dominant cause of a slow serial build — guard against it
+explicitly.** The classic mistake: feature B consumes a shared contract that feature A introduces,
+so the planner writes `B after A`. That edge is WRONG. The build's contract barrier freezes and
+lands *every* shared contract before any feature work, so B builds against the frozen shape and does
+not depend on A's implementation at all. The honest test for every candidate edge is: *"does this
+feature need the other's actual implemented runtime behavior, or just the shared shape they freeze?"*
+Only the former is a hard dep. A spurious "after the contract's author" edge forces features that
+could run concurrently to run one-at-a-time, idling build slots — exactly the failure that turns a
+~20-minute concurrent build into a ~90-minute serial one. When a plan comes out near-fully-serial,
+suspect over-declared edges first; the build stage emits a loud warning when ≤1 feature can start at
+the front, precisely so this surfaces at launch instead of after the wall-clock is spent.
 
 ## Contracts — decided once, indexed once, frozen once
 
