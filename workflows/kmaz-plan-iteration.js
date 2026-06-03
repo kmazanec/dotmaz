@@ -644,25 +644,45 @@ After writing, confirm the path.`,
   { label: 'write-index', phase: 'Persist', model: 'sonnet' },
 )
 
-log(`Plan complete. Present ${MANIFEST_PATH} + each spec's "Build plan (approved)" section to the human for approval.`)
+log(`Plan complete. The written plan files are UNCOMMITTED — present ${MANIFEST_PATH} + each spec's "Build plan (approved)" section to the human, then commit them at approval (see nextStep). The workflow does not commit; you do.`)
 // Cost visibility: rough output-token spend for this plan run (shared turn pool).
 try { log(`Spend: ~${Math.round(budget.spent() / 1000)}k output tokens so far this turn (${goodPlans.length} feature(s) planned, ${multiCount} via the multi-draft panel).`) } catch {}
 
 const _blocked = scope.blockers && scope.blockers.length
+
+// The EXACT set of files this workflow wrote, so the orchestrator commits these
+// at approval and nothing is left uncommitted (the workflow itself does NOT
+// commit — the commit lands the human-approved final state at the gate). Stage
+// ONLY these; the primary worktree may hold the human's unrelated dirty state,
+// which must never be swept in by a `git add -A`.
+const planFiles = [
+  MANIFEST_PATH,
+  ...goodPlans
+    .map((p) => featuresToplan.find((f) => f.id === p.featureId)?.specPath)
+    .filter(Boolean),
+]
+const _filesLine = planFiles.map((f) => `\`${f}\``).join(' ')
+
 return {
   iteration: scope.iterationName,
   iterationSlug: ITERATION_SLUG,
   manifestPath: MANIFEST_PATH,
+  // The exact files written this run — commit THESE at the approval gate.
+  planFiles,
   buildBranch: `build/${ITERATION_SLUG}`,
   blockers: scope.blockers ?? [],
   featureCount: goodPlans.length,
   features: goodPlans.map((p) => p.featureId),
   frozenContractCount: (contractSpec.frozenContracts ?? []).length,
-  // The plan is written with Status "Awaiting approval". A workflow can't take
-  // mid-run input, so approval happens in conversation: present the plan, and on
-  // the human's verbal approval the ASSISTANT (not the human) edits the plan's
-  // Status line to "Approved" and commits it — then STOPS. Launching the build
-  // stays user-triggered; do NOT auto-run it.
+  // The plan is written with Status "Awaiting approval" and left UNCOMMITTED in
+  // the working tree — the workflow does NOT commit (it can't take mid-run input,
+  // so it can't capture the human-approved final state). The ASSISTANT commits at
+  // the approval gate: present the plan, the human edits/approves in conversation,
+  // then the assistant flips Status → "Approved" and commits EXACTLY the files in
+  // `planFiles` (never `git add -A`) and verifies the tree is clean — then STOPS.
+  // The nextStep below spells this out as an ordered checklist so the commit is
+  // never skipped and no plan file is left dirty. Launching the build stays
+  // user-triggered; do NOT auto-run it.
   // The orchestrator OWNS getting this plan to a clean Approved state. The build
   // workflow is autonomous and cannot take input — so it must NEVER be the thing
   // that surfaces an open question. An Approved plan has ZERO unresolved items:
@@ -672,10 +692,16 @@ return {
   // with anything still open, the build will refuse and the pipeline is blocked —
   // which is the orchestrator's failure to finish approval, not a build problem.
   nextStep: _blocked
-    ? `Plan has ${scope.blockers.length} blocker(s): ${scope.blockers.map((b) => `"${b}"`).join('; ')}. You (the orchestrator) MUST resolve every one with the human now — get their decision, record it into the plan (the relevant spec or the manifest), and remove the blocker. Only when NO blocker remains do you flip Status to Approved. Do NOT flip Approved with blockers standing, and do NOT hand the human a build they'll have to babysit.`
+    ? `Plan has ${scope.blockers.length} blocker(s): ${scope.blockers.map((b) => `"${b}"`).join('; ')}. You (the orchestrator) MUST resolve every one with the human now — get their decision, record it into the plan (the relevant spec or the manifest), and remove the blocker. Only when NO blocker remains do you flip Status to Approved.
+
+The plan files this run WROTE are currently UNCOMMITTED in the working tree — the workflow does not commit them; you do, at approval. Do NOT leave them dirty. Once every blocker is resolved and recorded and the human has verbally approved, follow the SAME commit checklist as an unblocked plan: flip Status → Approved, confirm Blockers reads "None", then commit EXACTLY these files (never \`git add -A\`/\`git add .\`): ${_filesLine}. Then verify \`git status --short\` shows none of them still modified. Do NOT flip Approved with blockers standing, and do NOT hand the human a build they'll have to babysit.`
     : `Present AND TEACH the plan to the human (${MANIFEST_PATH} + the per-spec "Build plan (approved)" sections) — the approval gate is a teaching moment, not a yes/no. Walk them through: WHY the iteration was sliced into these features in this dependency order; which contracts got frozen and what each commits the build to; where the risk concentrates; which features build concurrently vs. serialize.
 
 CRITICAL — finish approval completely before flipping the status. SCAN the manifest AND every per-spec "Build plan (approved)" section for ANY open human-decision, "confirm at approval", "TBD", or unresolved choice. For EACH, get the human's decision now and RECORD it into the plan (edit the spec/manifest so the decision is locked in writing). The build workflow runs autonomously and CANNOT ask the human anything — so if you leave ANY open item, the build will refuse to start and the human is stuck. An Approved plan has ZERO open questions.
 
-THEN, once everything is resolved and recorded and the human has verbally approved: edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved", clear/confirm the Blockers section reads "None", and git-commit just the plan files you changed (the human does not edit them). THEN tell the human they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself, but the plan you hand off must be one the build can run start-to-finish without asking them a single question.`,
+THE PLAN FILES THIS RUN WROTE ARE CURRENTLY UNCOMMITTED. The workflow deliberately does NOT commit them — you commit the human-approved final state at this gate, so nothing is ever left dirty. Once everything is resolved/recorded and the human has verbally approved, do these IN ORDER and do not skip the commit:
+  1. Edit ${MANIFEST_PATH}'s "Status: Awaiting approval" → "Status: Approved" and confirm its Blockers section reads "None".
+  2. Commit EXACTLY the plan files this run wrote — and ONLY these, never \`git add -A\`/\`git add .\` (the primary worktree may hold the human's unrelated dirty state): ${_filesLine}. Use a conventional commit, e.g. \`docs(plan): approve ${ITERATION_SLUG} build plan\`.
+  3. VERIFY the commit took: run \`git status --short\` and confirm NONE of those files is still listed as modified/untracked. If any remains dirty, you have not finished — stage and commit it before handing off.
+  4. THEN tell the human they can run kmaz-build-iteration with args "${MANIFEST_PATH}" when ready — do NOT launch the build yourself. The plan you hand off must be one the build can run start-to-finish without asking them a single question.`,
 }
