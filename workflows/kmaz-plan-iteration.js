@@ -115,7 +115,8 @@ const SCOPE_SCHEMA = {
           specPath: { type: 'string', description: 'path to the nested feature spec, e.g. docs/iterations/01-skeleton/02-foo.md' },
           title: { type: 'string' },
           oneLineBeforeAfter: { type: 'string' },
-          dependsOn: { type: 'array', items: { type: 'string' }, description: 'feature ids this HARD-depends on — it consumes their not-yet-shipped behavior, so it must build after them. This is the ONLY ordering signal; everything not named here can build concurrently. A contract-mediated soft dep is NOT a hard dep (it builds against the frozen shape), so do NOT list it.' },
+          dependsOn: { type: 'array', items: { type: 'string' }, description: 'feature ids this HARD-depends on — it consumes their not-yet-shipped RUNTIME BEHAVIOR, so it must build after them. This is the ONLY ordering signal; everything not named here builds concurrently. A contract-mediated soft dep is NOT a hard dep: if this feature only CONSUMES or EXTENDS a shared contract that another feature introduces, that contract is frozen and landed by the build\'s contract barrier BEFORE any feature work — so this feature builds against the frozen shape and must NOT list the contract\'s author here. Listing it serializes the build behind a feature it does not actually depend on (the exact over-declaration that turns a concurrent build into a slow serial chain). Only name a feature here when you consume its actual implemented behavior, not its shared contract.' },
+          stack: { type: 'string', description: 'the feature\'s PRIMARY stack/domain in one kebab token, used to route the build to a stack specialist: e.g. "python-backend", "react-frontend", "node", "typescript", "go", "rust", "ruby", "rails", "swift". Pick the dominant one if a feature spans layers (most vertical slices have a clear center of gravity); use the closest match or a plain language/framework name.' },
           touchesContracts: { type: 'array', items: { type: 'string' }, description: 'names of shared contracts this feature introduces, consumes, or extends' },
           dependenciesVerifiedInCode: { type: 'boolean', description: 'true only if the stated dependencies actually exist in the code, not just the plan' },
           highUncertainty: { type: 'boolean', description: 'true ONLY for a feature whose approach is genuinely unsettled and worth THREE independent planning drafts instead of one: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open. A routine feature that extends an established pattern is NOT high-uncertainty — default false. Keep this rare; most features get the single-pass planner.' },
@@ -341,7 +342,8 @@ Then, for EACH feature you'll plan:
 - VERIFY its stated dependencies actually exist in the code (inspect the real code of dependency features, not just the plan). Set dependenciesVerifiedInCode accordingly. Trust the code over the plan where they diverge.
 - Identify which shared contracts it introduces/consumes/extends.
 - Set \`highUncertainty\` deliberately, and when true give a CONCRETE \`highUncertaintyReason\`. Default FALSE — a routine feature that extends an established pattern gets a single planning pass. Set TRUE only when the APPROACH is genuinely unsettled and worth three independent planning drafts: it introduces a load-bearing shared contract, involves a novel/subtle algorithm or a real security/concurrency boundary, or the spec leaves the approach materially open — and NAME which of these in highUncertaintyReason (the specific contract, algorithm, boundary, or open question). A vague reason won't trigger the panel; if you can't name a concrete one, set false. This is RARE — most iterations have ZERO such features. Flagging everything high-uncertainty defeats the point and burns tokens.
-- Set \`dependsOn\` to the feature ids this one HARD-depends on (it consumes their not-yet-shipped behavior). This is the only ordering signal the build uses, so keep it minimal and real — a contract-mediated soft dep is NOT a hard dep (it builds against the frozen shape, so leave it out), and a spurious edge needlessly serializes the build.
+- Set \`dependsOn\` to the feature ids this one HARD-depends on (it consumes their not-yet-shipped RUNTIME BEHAVIOR). This is the only ordering signal the build uses, so keep it minimal and real. A contract-mediated soft dep is NOT a hard dep: the build's contract barrier freezes + lands EVERY shared contract before any feature work, so a feature that merely consumes or extends a contract another feature introduces builds against the frozen shape and must NOT depend on that feature — leave the edge OUT. Over-declaring here is the dominant cause of a slow serial build: a spurious "after the feature that owns the contract" edge forces features that could run concurrently to run one-at-a-time, idling worktree slots. Ask for each candidate edge: "do I need their actual implemented behavior, or just the shared shape they freeze?" — only the former is a hard dep.
+- Set \`stack\` to the feature's primary domain (one kebab token like "python-backend", "react-frontend", "go") — the build routes the implementer and reviewer to that stack's specialist agent, so a wrong/absent stack just falls back to a generalist. Pick the dominant layer for a feature that spans several.
 
 Plan ALL the iteration's features — the independent ones AND the hard-dependent ones; do NOT drop a feature for having a hard dep. The build workflow serializes a feature behind its \`dependsOn\` automatically and runs everything else concurrently. Only raise a blocker when a dependency is genuinely MISSING FROM THE CODE, never merely because it builds later.
 
@@ -376,8 +378,34 @@ if (!featuresToplan.length) {
 
 phase('Plan')
 
+// Build a TARGETED reading brief per feature so the planner reads narrowly
+// instead of re-ingesting the whole architecture cold (the ~3.6M-token
+// re-read across ~10 plan agents). Scope already identified which contracts bind
+// this feature (touchesContracts) and where each lives (sourceOfTruth), and which
+// features it hard-depends on — name those so the planner reads JUST them.
+function readingBrief(f) {
+  const bound = (scope.sharedContracts ?? []).filter((c) =>
+    (f.touchesContracts ?? []).includes(c.name),
+  )
+  const adrList = bound.length
+    ? bound.map((c) => `  - "${c.name}" → source of truth: ${c.sourceOfTruth}`).join('\n')
+    : '  - (this feature touches no shared contract — skip contract/ADR reading)'
+  const deps = (f.dependsOn ?? [])
+  const depList = deps.length ? deps.join(', ') : '(none — no dependency code to read)'
+  return `READ NARROWLY — do NOT ingest the whole architecture. Read ONLY:
+  1. This feature's spec: \`${f.specPath}\` (in full).
+  2. ONLY the specific contract source-of-truth files/ADRs that bind THIS feature (not the whole adrs/ dir):
+${adrList}
+  3. ONLY the implemented code of the feature(s) this one HARD-depends on: ${depList}.
+Anything outside this list is out of scope for planning this feature — if the spec cites something not listed, note it as a risk rather than reading the entire corpus to chase it.`
+}
+
 const SINGLE_PASS_PLAN = (f) =>
-  `Draft the build plan for feature ${f.id} ("${f.title}") in ONE pass. Read its spec at \`${f.specPath}\`, the architecture/ADRs it cites, and the actual code of its dependencies — once. Reason through THREE lenses and fold them into a single plan:
+  `Draft the build plan for feature ${f.id} ("${f.title}") in ONE pass.
+
+${readingBrief(f)}
+
+Reason through THREE lenses and fold them into a single plan:
 • ARCHITECT: ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria; honor every locked ADR + existing code pattern; smallest change that satisfies each criterion; name which chunks touch shared contracts and the exact additive signature each needs frozen.
 • RESEARCHER (reuse): what library/pattern does the existing code already use for this kind of work? footguns / version / platform limits the spec misses? a simpler path using something already in the tree? Maximize reuse; flag technology risk.
 • CONTRARIAN (traps): where are acceptance criteria ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? Route the plan AROUND these and carry the survivors into \`risks\`.
@@ -390,28 +418,61 @@ For each chunk name the specific test file(s)/target(s) that prove it, so the bu
 // extra agents. Most features take the single-pass path above.
 const FORCE_MULTIDRAFT = args?.multiDraft === true
 const LENSES = [
-  { key: 'architect', prompt: (f) => `You are a senior software ARCHITECT drafting an implementation approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\`, the architecture/ADRs it cites, and the actual code of its dependencies. Propose the build as ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria. Honor every locked ADR decision and the existing code patterns. Favor the smallest change that satisfies each criterion. Name which chunks touch shared contracts and the exact additive signature each needs frozen, and name each chunk's specific test target(s). Return your draft plan.` },
-  { key: 'researcher', prompt: (f) => `You are a RESEARCHER pressure-testing the approach for feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and the cited architecture. Investigate: what library/pattern does the existing code already use (search the repo)? footguns, version constraints, platform limits the spec misses? a simpler path using something already in the tree? Return a plan that maximizes reuse and flags technology risk, with the same chunk/test-target/contract structure.` },
-  { key: 'contrarian', prompt: (f) => `You are a CONTRARIAN / skeptical senior engineer reviewing feature ${f.id} ("${f.title}"). Read its spec at \`${f.specPath}\` and dependencies. Find what's WRONG with the obvious approach: where will acceptance criteria be ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? Return a plan that routes around the traps, plus an explicit \`risks\` list of what a builder must not get wrong.` },
+  { key: 'architect', prompt: (f) => `You are a senior software ARCHITECT drafting an implementation approach for feature ${f.id} ("${f.title}").
+
+${readingBrief(f)}
+
+Propose the build as ordered vertical-slice chunks, each test-first, each satisfying named acceptance criteria. Honor every locked ADR decision and the existing code patterns. Favor the smallest change that satisfies each criterion. Name which chunks touch shared contracts and the exact additive signature each needs frozen, and name each chunk's specific test target(s). Return your draft plan.` },
+  // The researcher's job IS to range across the repo for reuse, so it keeps repo-
+  // search latitude — but it still starts from the feature's spec + bound contracts.
+  { key: 'researcher', prompt: (f) => `You are a RESEARCHER pressure-testing the approach for feature ${f.id} ("${f.title}"). Start from its spec at \`${f.specPath}\` and the contracts that bind it (${(f.touchesContracts ?? []).join(', ') || 'none'}). Then investigate the repo for reuse: what library/pattern does the existing code already use for this kind of work? footguns, version constraints, platform limits the spec misses? a simpler path using something already in the tree? Return a plan that maximizes reuse and flags technology risk, with the same chunk/test-target/contract structure.` },
+  { key: 'contrarian', prompt: (f) => `You are a CONTRARIAN / skeptical senior engineer reviewing feature ${f.id} ("${f.title}").
+
+${readingBrief(f)}
+
+Find what's WRONG with the obvious approach: where will acceptance criteria be ambiguous/untestable? where does the spec assume a contract that doesn't exist? riskiest chunk + why? hidden scope creep? Return a plan that routes around the traps, plus an explicit \`risks\` list of what a builder must not get wrong.` },
 ]
 
-// Evidence gate: the 4-Opus-agent panel only fires when highUncertainty is
-// backed by a CONCRETE reason — not a bare guess. A forced run (args.multiDraft)
-// bypasses the gate; otherwise we require a non-trivial reason string so a Sonnet
-// scope agent's optimistic "true" with no substance falls back to the single pass.
+// Features that INTRODUCE a load-bearing shared contract — the objective signal
+// that a feature is genuinely approach-unsettled enough to earn draft diversity.
+// (A feature that only consumes/extends a contract builds against a shape someone
+// else froze; it is not the one whose design is open.) Derived from the scope's
+// sharedContracts[].introducedBy, so it doesn't rely on a Sonnet agent's
+// subjective highUncertainty boolean alone.
+const CONTRACT_INTRODUCERS = new Set(
+  (scope.sharedContracts ?? []).map((c) => c.introducedBy).filter(Boolean),
+)
+
+// Evidence gate: the 4-Opus-agent panel is the single biggest plan-phase cost
+// (one panel = ~4× a single-pass plan), so it fires RARELY. A forced run
+// (args.multiDraft) bypasses the gate. Otherwise BOTH must hold: (a) the scope
+// agent flagged highUncertainty with a CONCRETE ≥20-char reason, AND (b) the
+// feature actually INTRODUCES a load-bearing shared contract — the objective
+// condition that makes the approach genuinely open. A feature the scope agent
+// merely *felt* was tricky, but that introduces no contract, falls to the
+// single-pass planner. This keeps the panel to the one or two foundational
+// features per iteration that truly earn it (e.g. the skeleton that freezes the
+// shared shapes), not every feature an optimistic scope pass flagged.
 function panelJustified(f) {
   if (FORCE_MULTIDRAFT) return true
   if (f.highUncertainty !== true) return false
   const reason = String(f.highUncertaintyReason ?? '').trim()
-  return reason.length >= 20 // a real, specific reason — not "" or "complex"
+  if (reason.length < 20) return false // a real, specific reason — not "" or "complex"
+  return CONTRACT_INTRODUCERS.has(f.id) // structural backstop: must own a contract
 }
 
 async function planFeature(f) {
   const multi = panelJustified(f)
   if (!multi) {
-    // Single-pass planner (the common path). If highUncertainty was flagged
-    // without a concrete reason, we land here deliberately.
-    if (f.highUncertainty === true) log(`${f.id}: highUncertainty flagged without a concrete reason — using the single-pass planner.`)
+    // Single-pass planner (the common path). A feature the scope flagged
+    // highUncertainty still lands here unless it ALSO introduces a shared
+    // contract — the panel is reserved for the foundational contract-owning slice.
+    if (f.highUncertainty === true) {
+      const why = String(f.highUncertaintyReason ?? '').trim().length < 20
+        ? 'no concrete reason'
+        : 'introduces no shared contract'
+      log(`${f.id}: highUncertainty flagged but ${why} — using the single-pass planner (panel reserved for contract-introducing features).`)
+    }
     return agent(SINGLE_PASS_PLAN(f), { label: `plan:${f.id}`, phase: 'Plan', schema: FEATURE_PLAN_SCHEMA, model: 'opus' })
   }
   // High-uncertainty (justified): three independent drafts → synth.
@@ -542,7 +603,12 @@ After writing, confirm the file path and the number of checkbox items written �
 const buildOrder = contractSpec.buildOrder ?? depEdges
 const indexFeatures = (scope.features ?? []).map((f) => {
   const order = buildOrder.find((b) => b.featureId === f.id)
-  return { id: f.id, specPath: f.specPath, title: f.title, after: order?.after ?? (f.dependsOn ?? []) }
+  // Carry `stack` so the build can route each feature's builder + reviewer to a
+  // stack specialist; omitted when scope didn't tag it (build falls back to a
+  // generalist).
+  const entry = { id: f.id, specPath: f.specPath, title: f.title, after: order?.after ?? (f.dependsOn ?? []) }
+  if (f.stack) entry.stack = f.stack
+  return entry
 })
 
 await agent(
@@ -565,9 +631,9 @@ ${(scope.blockers && scope.blockers.length) ? scope.blockers.map((b) => `- ${b}`
 A table of each contract: name, source of truth, frozen signature, the per-feature extensions, the exhaustive consumers.
 
 ## Features & build order
-A table: feature id → spec path (linked) → its "Build plan (approved)" section → \`after\` (the feature ids it builds after; empty = starts once contracts are frozen).
+A table: feature id → spec path (linked) → its "Build plan (approved)" section → \`stack\` (the specialist domain) → \`after\` (the feature ids it builds after; empty = starts once contracts are frozen).
 
-Then embed the machine-readable index as a fenced json block with EXACTLY these keys: { iterationName, iterationSlug: "${ITERATION_SLUG}", buildBranch: "build/${ITERATION_SLUG}", iterationGoal, blockers, frozenContracts, features: [{id, specPath, title, after}] }. iterationSlug and buildBranch MUST be exactly as given here — the build workflow scopes every artifact to them so iterations don't collide.
+Then embed the machine-readable index as a fenced json block with EXACTLY these keys: { iterationName, iterationSlug: "${ITERATION_SLUG}", buildBranch: "build/${ITERATION_SLUG}", iterationGoal, blockers, frozenContracts, features: [{id, specPath, title, stack, after}] }. Preserve each feature's \`stack\` exactly as given in the source data below (omit the key for a feature that has none). iterationSlug and buildBranch MUST be exactly as given here — the build workflow scopes every artifact to them so iterations don't collide.
 
 Source data:
 FROZEN CONTRACTS: ${JSON.stringify(contractSpec.frozenContracts ?? [], null, 2)}
