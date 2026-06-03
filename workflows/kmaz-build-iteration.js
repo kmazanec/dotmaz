@@ -9,7 +9,7 @@ export const meta = {
     { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any feature work', model: 'opus' },
     { title: 'Build', detail: 'per feature, in its own worktree: a Sonnet-tier builder (routed to the feature\'s stack specialist when tagged) TDDs each chunk to green running ONLY impacted tests in batched commits, then drives the running app once for QA evidence' },
     { title: 'Review', detail: 'per feature: ONE opus reviewer (routed to the stack specialist, a different voice than the builder) covers all 6 dimensions, a Sonnet fixer applies confirmed gating fixes; conditional skeptic on high-sev sec/spec', model: 'opus' },
-    { title: 'Converge', detail: 'opus integrator assembles + runs the full suite + e2e smoke + opens ONE MR; a Sonnet record-writer amends outcomes into specs + STATUS + lessons; deterministic teardown' },
+    { title: 'Converge', detail: 'one opus integrator assembles + runs the full suite + e2e smoke + amends outcomes into specs/STATUS/lessons + opens ONE MR; deterministic teardown' },
   ],
 }
 
@@ -54,10 +54,10 @@ export const meta = {
 //
 // EFFICIENCY: the dominant build cost is the agentic tool-loop, not the model —
 // every test run and commit re-feeds the agent's whole context. So the builder
-// works in BATCHES (implement a whole chunk, run impacted tests ONCE, commit
-// ONCE; drive the app ONCE at the end), and converge is split so the expensive
-// Opus turn does only the judgment-heavy assembly/suite/smoke/MR while a Sonnet
-// record-writer does the mechanical spec/STATUS/lesson transcription.
+// works in BATCHES (implement a whole chunk AND its tests, run impacted tests
+// ONCE per chunk, commit ONCE; drive the app ONCE at the end). Converge is ONE
+// Opus integrator that also writes the durable record itself (it already holds
+// the specs open from assembly — a separate writer just paid to re-read them).
 //
 // PARALLEL ITERATIONS: every artifact is slug-scoped — build/<slug>, worktrees
 // under .claude/worktrees/<slug>/, integration/<slug> — so two iterations build
@@ -290,38 +290,6 @@ const CONVERGE_SCHEMA = {
     leftOut: { type: 'array', items: { type: 'string' }, description: 'feature ids left out (blocked or conflicting) — their worktrees/branches MUST be preserved' },
     summary: { type: 'string', description: 'short human-facing summary of decisions + manual-review hotspots (mirrors the MR body)' },
     learned: { type: 'string', description: 'what building this iteration TAUGHT, in 2-4 plain sentences for the human: a library footgun hit, a perf cliff, a contract that needed an extra variant, an assumption that proved wrong, a place the design fought the implementation. The teaching version of the propagated lessons — empty only if genuinely nothing notable surfaced.' },
-    // The integrator returns the outcome DATA; the Sonnet record-writer transcribes
-    // it into specs / STATUS / durable docs. Keeps the Opus turn off the
-    // file-writing it doesn't need judgment for.
-    featureOutcomes: {
-      type: 'array',
-      description: 'per-feature outcome the record-writer amends into each spec',
-      items: {
-        type: 'object',
-        required: ['featureId', 'specPath', 'shippable'],
-        properties: {
-          featureId: { type: 'string' },
-          specPath: { type: 'string' },
-          shippable: { type: 'boolean' },
-          acceptanceStatus: { type: 'string' },
-          unresolvedGating: { type: 'string' },
-          deferred: { type: 'string' },
-          qaEvidence: { type: 'string', description: 'one-line quoted QA/smoke evidence' },
-        },
-      },
-    },
-    durableLessons: {
-      type: 'array',
-      description: 'lessons to propagate to durable docs; [] when nothing material',
-      items: {
-        type: 'object',
-        required: ['target', 'note'],
-        properties: {
-          target: { type: 'string', enum: ['ADR', 'ARCHITECTURE', 'ROADMAP', 'CLAUDE', 'STATUS'] },
-          note: { type: 'string' },
-        },
-      },
-    },
   },
 }
 
@@ -441,7 +409,9 @@ const barrier = await agent(
 
 Before creating the worktree, ensure \`.claude/worktrees/\` is gitignored (it holds transient build trees that must never be committed): if it isn't already ignored, add it to \`.git/info/exclude\` (don't modify a tracked .gitignore unless the project clearly wants it there).
 
-After landing the contracts, run ONLY the tests that exercise these contract shapes + their exhaustive consumers (the named source-of-truth files and their direct test targets) until green — NOT the whole suite (the full suite runs once at convergence). Quote that scoped result.
+Work in BATCHES to keep this fast — implement ALL the contract shapes and their exhaustive consumers FIRST (all the edits), THEN run tests, rather than running after each shape. The contract shapes are type/schema definitions; you know them up front from the list below, so there is little to "discover" by testing incrementally.
+
+TOOL-USE BUDGET (a hard efficiency target): after all the edits are in place, run ONLY the tests that exercise these contract shapes + their exhaustive consumers (the named source-of-truth files and their direct test targets) — NOT the whole suite (that runs once at convergence). Run that scoped set ONCE; if anything failed, read ALL the failures from that one run, fix them together, and re-run ONCE to confirm. Aim for ~1–2 test runs total, not a run-after-every-edit loop (the measured biggest waste in this pipeline). Quote the final green scoped result.
 
 You MUST NOT implement feature behavior — only the contract shapes + their exhaustive consumers.
 
@@ -494,9 +464,11 @@ async function buildFeature(f) {
 
 ${frozenBrief}
 
-Your plan is the "Build plan (approved)" section in the spec \`${f.specPath}\`. Build it test-first, ONE CHUNK AT A TIME. Work in BATCHES to keep the build fast — every test run and every commit is an expensive round-trip, so do NOT run tests or commit after every edit. Per chunk:
-1. Write ALL the tests the chunk's acceptance criteria require (the criteria ARE the test spec), then implement the whole chunk (smallest change that satisfies the criteria — no scope creep). Make all the file edits for the chunk before running anything.
-2. Run the chunk's impacted tests ONCE, at the end of the chunk — the test target(s) the plan names for it plus the tests you wrote — until green. Do NOT run the whole suite during the build (the full suite runs ONCE at convergence), and do NOT re-run after every single edit — implement the chunk, then run once; only re-run if it was red. Use the narrowest invocation the runner supports (a file path, a test name/pattern, a package/target filter).
+Your plan is the "Build plan (approved)" section in the spec \`${f.specPath}\`. Build it test-first, ONE CHUNK AT A TIME. Work in BATCHES to keep the build fast — every test run and every commit is an expensive round-trip, so do NOT run tests or commit after every edit.
+
+TOOL-USE BUDGET (a hard efficiency target, not a suggestion): aim for roughly ONE test-run and ONE commit per chunk — so a feature of N chunks costs about N test-runs total, not 3-5× that. If you notice yourself running the test command many times for one chunk, STOP and batch: make all the edits, then run once. The biggest measured waste in this pipeline is builders re-running tests after every small edit; a tight write→run→fix-all→run rhythm is the single highest-leverage thing you control. Per chunk:
+1. Write ALL the tests the chunk's acceptance criteria require (the criteria ARE the test spec), then implement the whole chunk (smallest change that satisfies the criteria — no scope creep). Make ALL the file edits for the chunk — every test AND all the implementation — before you run anything. Do NOT run a test to "check" mid-way; finish the chunk's code first.
+2. Run the chunk's impacted tests ONCE, at the end of the chunk — the narrowest invocation the runner supports (a file path / test name / package filter), NOT the whole suite (that runs once at convergence). Then handle the result in BATCH: if some failed, read ALL the failures from that single run, fix every one of them together, and re-run ONCE to confirm. Two runs per chunk (write→run→fix-all→run) is the target; do NOT enter a write-one-fix→run→write-next-fix→run loop. A test run is an expensive context round-trip — running per-edit is the single biggest waste in the build, so a chunk should cost ~1–2 test runs, never 5+.
 3. Tick the chunk's checkbox in the spec and commit the chunk as ONE commit (Conventional Commits) — one commit per chunk, not per file. If a chunk is genuinely tiny, fold it into the next commit; granular means per-chunk, not per-edit.
 
 Repeat for every chunk. Then, ONCE, after the whole feature is built and all chunk tests are green:
@@ -672,27 +644,27 @@ phase('Build') // Build/Review interleave per feature via opts.phase on each age
 const featureResults = (await Promise.all(manifest.features.map((f) => runFeature(f)))).filter(Boolean)
 
 // === Phase 5: Converge =====================================================
-// Split into TWO agents so the expensive Opus turn does only the work that needs
-// judgment (cherry-pick conflict resolution, the integrated suite, the smoke, the
-// push/MR), and the mechanical durable-record writing rides a cheap Sonnet:
+// ONE Opus integrator does the whole finalization: assemble the shippable
+// branches onto ONE integration branch by cherry-pick/rebase (zero merge commits
+// — linear history mandatory, verified with `git log --merges`), run the ONE
+// full-suite pass + an end-to-end smoke, AMEND each feature's outcome into its
+// spec + update STATUS.md + propagate durable lessons, then push + open ONE MR
+// (does NOT merge it). Returns the MR URL to the USER only (never a tracked file).
 //
-//  - INTEGRATE (Opus): assemble the shippable branches onto ONE integration
-//    branch by cherry-pick/rebase (zero merge commits — linear history is
-//    mandatory, verified with `git log --merges`), run the ONE full-suite pass +
-//    an end-to-end smoke, then push + open ONE MR (does NOT merge it). Returns
-//    the MR URL to the USER only (never into a tracked file). This is the
-//    judgment-heavy part and stays on Opus.
-//  - RECORD (Sonnet): amend each feature's "### Build outcome" into its spec,
-//    update STATUS.md, propagate durable lessons (ADR/ROADMAP/CLAUDE), then commit
-//    + push those edits to the already-open MR's branch (the MR auto-updates).
-//    This is templating known outcomes into Markdown — no judgment, so Sonnet.
+// Why folded (was a separate Sonnet "record" agent): the record step re-Read every
+// spec the integrator had ALREADY loaded and decided the outcome for — measured at
+// ~500k tokens + a ~2-min round-trip per build, almost all of it re-discovering
+// what the integrator already held. The actual writing is tiny (~5k output tokens
+// of Markdown), so doing it inside the integrator — which has the files open and
+// just decided shippable/blocked + traced the PRD criteria — is strictly cheaper
+// than handing the data to a cold agent. The model tier "Sonnet does mechanical
+// writing" loses to "don't pay to re-load context you already have." Writing
+// BEFORE the push also lands the outcomes in the initial MR (no second push).
 //
-// Why this order (integrate+push THEN record): the spec amendments are durable
-// notes, not code — landing them as a follow-up commit to the open MR is fine and
-// keeps the Opus turn from re-reading every spec. Teardown stays a DETERMINISTIC
-// post-step keyed off the integrator's verified `shipped` list, so an early stop
-// in either agent can't silently skip it. Autonomous finalization is correct: the
-// human's gate was approving the plan; re-gating the push is the bug it fixes.
+// Teardown stays a DETERMINISTIC post-step keyed off the integrator's verified
+// `shipped` list, so an early stop can't silently skip it. Autonomous finalization
+// is correct: the human's gate was approving the plan; re-gating the push is the
+// bug it fixes.
 
 phase('Converge')
 
@@ -706,66 +678,30 @@ const shippable = featureResults.filter(isShippable)
 const blocked = featureResults.filter((r) => !isShippable(r))
 
 const convergence = await agent(
-  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each SHIPPABLE feature built on its own \`feat/<id>\` branch off that. You finalize AUTONOMOUSLY — assemble, verify, push, open ONE MR. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). A separate Sonnet step AFTER you writes the per-spec build-outcome notes + STATUS.md + durable lessons, so DO NOT do that here — your job is assembly, verification, and the MR. You do NOT tear down worktrees — a deterministic post-step does that from the \`shipped\` list you return. The only thing that stops you is a real cherry-pick conflict needing human judgment.
+  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each SHIPPABLE feature built on its own \`feat/<id>\` branch off that. You finalize AUTONOMOUSLY — assemble, verify, record outcomes, push, open ONE MR. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). You do NOT tear down worktrees — a deterministic post-step does that from the \`shipped\` list you return. The only thing that stops you is a real cherry-pick conflict needing human judgment.
 
 1. ASSEMBLE the SHIPPABLE feature branches (below) onto an iteration-scoped integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration never collides). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Ship SHIPPABLE features only; leave any blocked feature OUT (its branch/worktree stays untouched for the human).
    LINEAR HISTORY IS MANDATORY — ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature's commits in dependency order (\`git cherry-pick\`), or \`git rebase --onto\`. NEVER \`git merge\` (and never \`cherry-pick -m\`) — a merge commit is a failure. Resolve predicted convergence in place as ordinary commits. A SHIPPABLE feature is NEVER left out for a TEXTUAL or PREDICTED cherry-pick conflict — the plan already anticipated these ("whoever merges second rebases"), so reconciling them in place IS your job, not grounds for bailing; rebase/resolve and carry on. The ONLY thing that may stop a shippable feature is a genuinely UNRESOLVABLE SEMANTIC conflict (two features need contradictory logic in the same place that no rebase can reconcile) — and then it is a HARD FAILURE, not a quiet drop: set its \`blockedReason\` to the specific contradiction and surface it loudly in your return so the human sees a flagged problem, never a silently-shrunk MR. Shipping ONE MR with ALL reviewed-clean work is the contract; a feature that passed review must land. VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing; quote the empty result in \`linearHistoryProof\`.
 2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch — this is the ONE full-suite run (the per-feature build + fix steps ran only impacted tests). Fix any failures here: a failure now is an integration break the scoped runs couldn't see. The suite MUST end green before you push.
-3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`} DEFINITION OF DONE — trace to the PRD, not just the spec: for each shipped feature, confirm it observably satisfies the PRD acceptance criteria it traces to (the spec's "Requirements traced" links them; the PRD's section 6 criteria are written as Given/When/Then assertions). A feature whose spec boxes are ticked but whose PRD criterion isn't met is NOT done — set it not-done in \`featureOutcomes\` (below) and treat it as left-out, not shipped.
-4. PUSH + OPEN THE MR autonomously — do NOT wait for the human, do NOT ask permission (the human delegated finalization by running this build). \`git push -u origin integration/${ITERATION_SLUG}\`, then open ONE MR/PR against the repo's default branch using the project's forge (\`glab mr create\` / \`gh pr create\`; discover which from the remote). MR body = the decisions + load-bearing areas to review manually (contract changes, trust boundaries) + deferred/blocked items. Do NOT merge it. Return the MR URL in \`mrUrl\` — do NOT write it into any tracked file (that forces another commit/push and the back-link rots; the user gets it from your return). If push or MR-open genuinely fails (no remote, auth), set \`pushError\` to the exact error and \`mrOpened\`=false so the human can finish — that is the ONLY case where you stop short of an open MR.
-5. REPORT, for the Sonnet record-writer and the deterministic teardown that run next:
+3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`} DEFINITION OF DONE — trace to the PRD, not just the spec: for each shipped feature, confirm it observably satisfies the PRD acceptance criteria it traces to (the spec's "Requirements traced" links them; the PRD's section 6 criteria are written as Given/When/Then assertions). A feature whose spec boxes are ticked but whose PRD criterion isn't met is NOT done — treat it as left-out, not shipped.
+4. RECORD THE OUTCOMES (do this BEFORE pushing, so they land in the initial MR — you already have these files open from assembly, so this is a few quick edits, not a re-investigation):
+   a. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC. For each feature (shipped AND left-out), append a short "### Build outcome" note under that spec's "## Build plan (approved)" section: shippable y/n, acceptance status, any unresolved gating finding, deferred items, and a one-line QA evidence quote. Keep it tight — this is the durable record. Insert the note, leave every other byte unchanged. Do NOT reference ephemeral build-process internals in code — only in spec/commit text.
+   b. UPDATE \`docs/STATUS.md\` if it exists: mark this iteration's shipped features shipped and any left-out ones blocked; set the "Now"/"What's next" lines to reflect reality (the next iteration to plan/build, noting any that can run concurrently). Keep it terse. If it doesn't exist, skip it.
+   c. PROPAGATE DURABLE LESSONS — only if material (don't manufacture them): a lesson that changes the design → a new superseding ADR under docs/adrs/ or ARCHITECTURE.md; that changes the plan → ROADMAP.md; about how to build in this repo → CLAUDE.md. "Nothing material" is a valid outcome.
+   Commit these spec/STATUS/doc edits on the integration branch (Conventional Commits, e.g. \`docs: record ${ITERATION_SLUG} build outcomes\`) — stage ONLY the files you changed, never \`git add -A\`.
+5. PUSH + OPEN THE MR autonomously — do NOT wait for the human, do NOT ask permission (the human delegated finalization by running this build). \`git push -u origin integration/${ITERATION_SLUG}\`, then open ONE MR/PR against the repo's default branch using the project's forge (\`glab mr create\` / \`gh pr create\`; discover which from the remote). MR body = the decisions + load-bearing areas to review manually (contract changes, trust boundaries) + deferred/blocked items. Do NOT merge it. Return the MR URL in \`mrUrl\` — do NOT write it into any tracked file (that forces another commit/push and the back-link rots; the user gets it from your return). If push or MR-open genuinely fails (no remote, auth), set \`pushError\` to the exact error and \`mrOpened\`=false so the human can finish — that is the ONLY case where you stop short of an open MR.
+6. REPORT, for the deterministic teardown that runs next:
    - \`shipped\`: the feature ids whose commits you VERIFIED are present on \`integration/${ITERATION_SLUG}\` (do a \`git log\`/\`git cherry\` check — only ids you confirmed). \`leftOut\`: the blocked/conflicting ids whose worktrees must be PRESERVED. Do NOT remove any worktree or branch yourself.
-   - \`featureOutcomes\`: one entry per feature (shipped AND left-out) the record-writer will transcribe into specs — {featureId, specPath, shippable, acceptanceStatus, unresolvedGating, deferred, qaEvidence (one-line quote)}. This is the data; you do NOT write it into files.
    - \`learned\`: the TEACHING version of what building taught (2-4 plain sentences for the human) — the footgun, the perf cliff, the contract that needed another variant, the assumption that broke. Returned to the human, not written to a file.
-   - \`durableLessons\`: any lesson that should propagate to a durable doc — {target: "ADR"|"ARCHITECTURE"|"ROADMAP"|"CLAUDE"|"STATUS", note}. "Nothing material" is valid — return []; don't manufacture lessons. The record-writer applies these.
 
 Preliminary shippable (tests green, no unresolved gating — cherry-pick + ship these): ${JSON.stringify(shippable.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath, title: r.title })), null, 2)}
 Preliminary blocked (leave OUT, preserve worktrees): ${JSON.stringify(blocked.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath, unresolvedGating: r.unresolvedGating })), null, 2)}`,
   { label: 'integrate', phase: 'Converge', schema: CONVERGE_SCHEMA, model: 'opus' },
 )
 
-// RECORD (Sonnet): the mechanical durable-record writing the Opus integrator
-// deliberately skipped — amend each feature's "### Build outcome" into its spec,
-// update STATUS.md, propagate the integrator's durableLessons, then commit + push
-// to the already-open MR's branch (it auto-updates). Pure transcription of known
-// outcomes into Markdown — no judgment — so it rides Sonnet, not Opus. Only runs
-// when the MR actually opened (else the branch isn't pushed and there's nothing to
-// amend onto); a pushError leaves the durable record for the human alongside the
-// branch they must finish by hand.
-let record = null
-if (convergence?.mrOpened && !convergence?.pushError) {
-  const outcomes = Array.isArray(convergence?.featureOutcomes) ? convergence.featureOutcomes : []
-  const lessons = Array.isArray(convergence?.durableLessons) ? convergence.durableLessons : []
-  record = await agent(
-    `You are writing the DURABLE RECORD for iteration "${manifest.iterationName}", now that its MR is open on branch \`integration/${ITERATION_SLUG}\`. Work in the integration worktree \`${WORKTREE_DIR}/integration\` (it holds the pushed branch) — NEVER \`git checkout\`/\`switch\` the primary worktree (the human works there on main). This is transcription of already-decided outcomes into Markdown; decide nothing new.
-
-1. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC. For each outcome below, append a short "### Build outcome" note under that spec's "## Build plan (approved)" section: shippable y/n, acceptance status, any unresolved gating finding, deferred items, and the one-line QA evidence quote. Keep it tight — this is the durable record. Read the file, insert the note, leave every other byte unchanged. Do NOT reference ephemeral build-process internals in code — only in spec/commit text.
-2. UPDATE \`docs/STATUS.md\` if it exists: mark this iteration's shipped features shipped and any left-out ones blocked; set the "Now"/"What's next" lines to reflect reality (the next iteration to plan/build, noting any that can run concurrently). Keep it terse — it's the project's rolling re-entry point. If STATUS.md doesn't exist, skip it.
-3. PROPAGATE the durable lessons below to their target docs: target "ADR" → a new superseding ADR under docs/adrs/; "ARCHITECTURE" → ARCHITECTURE.md; "ROADMAP" → ROADMAP.md; "CLAUDE" → CLAUDE.md; "STATUS" → STATUS.md. If the list is empty, propagate nothing — do NOT manufacture lessons.
-4. COMMIT the spec/STATUS/doc edits (Conventional Commits, e.g. \`docs: record <iteration> build outcomes\`) — stage ONLY the files you changed, never \`git add -A\`. Then \`git push\` to update the open MR's branch.
-
-Per-feature outcomes to transcribe:
-${JSON.stringify(outcomes, null, 2)}
-
-Durable lessons to propagate (may be empty):
-${JSON.stringify(lessons, null, 2)}
-
-Report which spec files you amended, whether STATUS.md was updated, which durable docs you touched, and the commit sha you pushed.`,
-    { label: 'record', phase: 'Converge', model: 'sonnet', schema: {
-      type: 'object',
-      required: ['specsAmended'],
-      properties: {
-        specsAmended: { type: 'array', items: { type: 'string' } },
-        statusUpdated: { type: 'boolean' },
-        durableDocsTouched: { type: 'array', items: { type: 'string' } },
-        commitSha: { type: 'string' },
-        notes: { type: 'string' },
-      },
-    } },
-  )
-} else {
-  log(`Skipping durable-record writing — ${convergence?.pushError ? 'push/MR-open failed' : 'no MR opened'}; outcomes left for the human.`)
-}
+// (The durable-record writing — spec outcomes, STATUS, lessons — is now done by
+// the integrator itself, before its push, since it already holds those files
+// open. No separate record agent.)
 
 // === Deterministic teardown ================================================
 // Teardown runs HERE, in workflow code, keyed off the ids the converge agent
@@ -824,7 +760,6 @@ return {
   // What building taught the human — relay this to them, it's the build's
   // contribution to the teach-the-human loop. Not written to any file.
   learned: convergence?.learned ?? '',
-  record: record ? { specsAmended: record.specsAmended ?? [], statusUpdated: record.statusUpdated === true, durableDocsTouched: record.durableDocsTouched ?? [] } : null,
   teardown: teardown ? { removed: teardown.removed ?? [], kept: teardown.kept ?? [] } : null,
   // The MR URL is the deliverable — say it to the user; it is deliberately NOT
   // written into any tracked file.

@@ -93,10 +93,14 @@ a specialist builder is still Sonnet, a specialist reviewer is still Opus.
 
 **The build cost is the tool-loop, not the model.** The dominant token cost of a build agent is the
 agentic round-trip — every test run and every commit re-feeds the agent's whole context — not the
-model's reasoning. So build agents work in **batches**: implement a whole chunk, run its impacted
-tests *once*, commit *once* per chunk; drive the running app *once* at the end, not per chunk. Same
-test-first discipline, an order of magnitude fewer round-trips. A fine-grained run-after-every-edit
-loop is the single biggest avoidable token sink in the pipeline.
+model's reasoning. So build agents work in **batches**: implement a whole chunk *and all its tests*,
+run its impacted tests *once*, commit *once* per chunk; drive the running app *once* at the end, not
+per chunk. When a test run is red, read *all* the failures from that one run and fix them together,
+then re-run once — a `write→run→fix-all→run` rhythm (~1–2 runs per chunk), never
+`write-one-fix→run→write-next→run`. Measured: builders that re-run tests after every small edit hit
+30+ test runs for one feature — the **single biggest avoidable token sink in the pipeline**. Give
+build/contract agents an explicit tool-use budget (≈one test-run and one commit per chunk) so they
+self-monitor; the instruction "run until green" without a budget invites the per-edit loop.
 
 **The multi-draft planning panel is the most expensive plan-phase step — reserve it.** A
 feature that escalates to the 3-independent-drafts-plus-synth panel costs ~4× a single-pass plan, so
