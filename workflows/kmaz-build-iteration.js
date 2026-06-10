@@ -1,13 +1,13 @@
 export const meta = {
   name: 'kmaz-build-iteration',
   description:
-    'Build an approved iteration: implement + commit the frozen shared contracts first, then build each feature in its own worktree (independent features concurrently, hard-dependent ones after their deps) — Sonnet builds test-first to the spec checklist running only the impacted tests, drives the running app for QA evidence, then ONE opus reviewer covers all six dimensions (spec/security/robustness/efficiency/convention/contrarian) and delegates each confirmed gating fix to a Sonnet fixer, with a conditional skeptic re-checking only high-severity security/spec. Assembles the shippable features onto one linear integration branch, runs the full suite once, opens ONE MR, and amends each feature\'s outcome into its spec.',
+    'Build an approved iteration: implement + commit the frozen shared contracts first on the iteration build branch, then build features DEPENDENCY-ORDERED — serial work stacks directly on that build branch in ONE shared worktree, a FRESH Sonnet builder agent per feature (context isolation comes from new agents, not new branches); only genuinely-concurrent features get their own worktrees (forked from the last stable trunk sha) and are folded back onto the trunk by cherry-pick when shippable. Dependents of a blocked/skipped feature are SKIPPED loudly, never built against a guessed base. Builders run impacted tests per chunk plus ONE repo typecheck/build gate per feature, drive the running app for QA evidence; then ONE opus reviewer covers all six dimensions (spec/security/robustness/efficiency/convention/contrarian) and delegates each confirmed gating fix to a Sonnet fixer, with a conditional skeptic re-checking only high-severity security/spec. Converge cuts the integration branch from the verified trunk (linear by construction), runs the full suite once, opens ONE MR, and amends each feature\'s outcome into its spec.',
   whenToUse:
-    'Run AFTER kmaz-plan-iteration and AFTER the iteration\'s BUILD-PLAN-<slug>.md Status is "Approved" (the assistant flips it on the human\'s verbal approval). Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — the primary worktree (where the human works on main) is never touched. Finalizes autonomously: assembles the shippable features onto ONE linear integration branch (cherry-pick, no merge commits), runs the FULL test suite once at the end, amends each feature\'s build outcome into its spec, pushes the branch, opens ONE MR (does not merge it), returns the MR URL to the user (never written to a file), and deterministically tears down the transient per-feature worktrees/branches once the MR is open. Blocked features are left out with their worktrees preserved.',
+    'Run AFTER kmaz-plan-iteration and AFTER the iteration\'s BUILD-PLAN-<slug>.md Status is "Approved" (the assistant flips it on the human\'s verbal approval). Builds autonomously from the approved plan; does not take mid-run input. Every artifact is name-scoped to the iteration slug (branch build/<slug>, worktrees under .claude/worktrees/<slug>/), so multiple iterations can build CONCURRENTLY without colliding. All build work is isolated in .claude/worktrees/ — serial features share the iteration\'s ONE build worktree on build/<slug>; additional worktrees exist only while features genuinely build in parallel and are folded back when shippable; the primary worktree (where the human works on main) is never touched. Finalizes autonomously: cuts ONE linear integration branch from the verified trunk tip, runs the FULL test suite once at the end, amends each feature\'s build outcome into its spec, pushes the branch, opens ONE MR (does not merge it), returns the MR URL to the user (never written to a file), and deterministically tears down the transient worktrees/branches once the MR is open. Blocked/skipped features are left out with their work preserved.',
   phases: [
-    { title: 'Load', detail: 'resolve the approved plan unambiguously by slug + per-feature plans; sanity-check it is approved' },
-    { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any feature work', model: 'opus' },
-    { title: 'Build', detail: 'per feature, in its own worktree: a Sonnet-tier builder (routed to the feature\'s stack specialist when tagged) TDDs each chunk to green running ONLY impacted tests in batched commits, then drives the running app once for QA evidence' },
+    { title: 'Load', detail: 'resolve the approved plan unambiguously by slug + per-feature plans; sanity-check it is approved; preflight the git remote' },
+    { title: 'Contract barrier', detail: 'implement + commit the frozen shared contracts on the build branch before any feature work; its worktree persists as the iteration trunk', model: 'opus' },
+    { title: 'Build', detail: 'dependency-ordered: serial features build on the shared trunk worktree (fresh Sonnet builder per feature, routed to the stack specialist), concurrent-ready features in their own worktrees forked from the last stable sha and folded back when shippable; dependents of blocked features are skipped; each feature passes impacted tests + one typecheck/build gate' },
     { title: 'Review', detail: 'per feature: ONE opus reviewer (routed to the stack specialist, a different voice than the builder) covers all 6 dimensions, a Sonnet fixer applies confirmed gating fixes; conditional skeptic on high-sev sec/spec', model: 'opus' },
     { title: 'Converge', detail: 'one opus integrator assembles + runs the full suite + e2e smoke + amends outcomes into specs/STATUS/lessons + opens ONE MR; deterministic teardown' },
   ],
@@ -42,8 +42,20 @@ export const meta = {
 // reviews (the reviewer delegates fixes back to a Sonnet fixer); the build
 // schedules all concurrency off feature.after (hard deps); all work is isolated
 // in .claude/worktrees/, never the primary worktree. This workflow's specifics:
-// ONE worktree per FEATURE, and the contract step runs first on a shared build
-// branch (its own worktree) that every feature worktree forks from.
+// the contract barrier's worktree PERSISTS as the iteration's TRUNK (the one
+// shared build worktree on build/<slug>). Serial work stacks directly on the
+// trunk, one FRESH builder agent per feature — context isolation comes from new
+// agents, not new branches. A feature gets its OWN worktree only when another
+// feature currently owns the trunk (genuine parallelism), forked from the last
+// STABLE trunk sha, and is folded back by cherry-pick once reviewed-shippable.
+// WHY (measured failure): when every feature forked from the bare contracts
+// commit, a dependent's worktree never contained its dep's code — the scheduler
+// sequenced TIME but not CODE — and the builder invented the missing base,
+// wasting its entire spend on an unmergeable fork. Two guardrails enforce the
+// fix: (1) a dependent whose hard dep did not ship (blocked, skipped, or
+// unfolded) is SKIPPED loudly, never built on a guess; (2) every feature passes
+// the repo's typecheck/build gate once, because impacted unit tests alone
+// provably miss type errors, undeclared deps, and packaging breaks.
 //
 // SPECIALIST ROUTING: the model TIER (Sonnet build / Opus review) is orthogonal
 // to the agent TYPE. When plan-iteration tags a feature with a `stack`, the
@@ -154,7 +166,10 @@ const MANIFEST_SCHEMA = {
       },
     },
     testCommand: { type: 'string', description: 'the repo’s actual test command(s), discovered from the repo not assumed' },
+    checkCommand: { type: 'string', description: 'the repo’s typecheck/build gate command(s), discovered not assumed (e.g. "pnpm -r typecheck && pnpm -r build", "cargo check", "go build ./..."). Empty string if the repo has none yet (greenfield) — builders then discover/establish it.' },
     runAppHint: { type: 'string', description: 'how a user/caller runs the app (dev server + URL, CLI binary, endpoint) — for QA' },
+    remoteConfigured: { type: 'boolean', description: 'true if `git remote -v` shows a pushable remote — checked NOW so a missing remote surfaces before hours of build, not at the final push' },
+    remoteNote: { type: 'string', description: 'the remote name+URL, or what is missing' },
   },
 }
 
@@ -172,7 +187,7 @@ const BARRIER_SCHEMA = {
 
 const BUILD_SCHEMA = {
   type: 'object',
-  required: ['featureId', 'branch', 'worktree', 'chunksComplete', 'chunksTotal', 'allTestsGreen'],
+  required: ['featureId', 'branch', 'worktree', 'chunksComplete', 'chunksTotal', 'allTestsGreen', 'headSha', 'checkGreen'],
   properties: {
     featureId: { type: 'string' },
     branch: { type: 'string' },
@@ -180,6 +195,9 @@ const BUILD_SCHEMA = {
     chunksComplete: { type: 'integer' },
     chunksTotal: { type: 'integer' },
     allTestsGreen: { type: 'boolean' },
+    headSha: { type: 'string', description: '`git rev-parse HEAD` after your final commit — the trunk/fold bookkeeping depends on it' },
+    checkGreen: { type: 'boolean', description: 'true only if the repo typecheck/build gate passed over the finished feature' },
+    checkEvidence: { type: 'string', description: 'quoted result of the typecheck/build gate run ONCE over the finished feature; "n/a: <reason>" only if no such toolchain can exist yet' },
     testEvidence: { type: 'string', description: 'quoted suite output line (counts/exit code)' },
     qaEvidence: { type: 'string', description: 'quoted evidence from driving the REAL running app/CLI/endpoint (HTTP status, DOM state, screenshot ref, output line). "deferred: <reason>" only if no runnable surface yet.' },
     deferredCheckboxes: { type: 'array', items: { type: 'string' }, description: 'checkboxes left unticked + why (needs human-only key/device)' },
@@ -232,6 +250,7 @@ const FIX_RESULT_SCHEMA = {
   type: 'object',
   required: ['fixedIds', 'testsGreen'],
   properties: {
+    headSha: { type: 'string', description: '`git rev-parse HEAD` after your fix commits (required whenever you committed) — the trunk/fold bookkeeping depends on it' },
     fixedIds: { type: 'array', items: { type: 'string' }, description: 'the finding ids you fixed + committed' },
     unfixedIds: { type: 'array', items: { type: 'string' }, description: 'ids you could NOT fix as a localized edit (report back; do not force)' },
     fixSummary: { type: 'string', description: 'one-line summary of the fixes applied' },
@@ -313,6 +332,8 @@ Determine:
 - The frozen contracts (name, source of truth, signature, per-feature extensions, exhaustive consumers).
 - The features (id, spec path, title, hard-dep "after" list).
 - The repo's ACTUAL test command (discover it — do not assume a stack) and how a user runs the app (for QA).
+- The repo's typecheck/build gate command(s) (e.g. from package.json scripts / Makefile / the build tool) — empty if the repo has none yet.
+- PREFLIGHT THE REMOTE: run \`git remote -v\`. Set remoteConfigured=true only if a pushable remote exists; report it (or what's missing) in remoteNote. This run ends by pushing a branch and opening an MR — a missing remote must surface NOW, not after hours of build.
 
 Return the structured plan.`,
   // Sonnet: reads the plan + discovers the test command and fills a schema —
@@ -340,8 +361,22 @@ const buildBranch = BUILD_BRANCH ?? manifest.buildBranch ?? `build/${ITERATION_S
 // branch — never the primary worktree (the human works on main there, live).
 // Every worktree for this iteration nests under one slug-scoped dir.
 const WORKTREE_DIR = `.claude/worktrees/${ITERATION_SLUG}`
+// The TRUNK: the iteration's ONE shared build worktree, created by the contract
+// barrier and persisting through the whole build. Serial features build here.
+const TRUNK_WORKTREE = `${WORKTREE_DIR}/build`
 const testCommand = manifest.testCommand
-log(`Approved: ${manifest.iterationName} (slug "${ITERATION_SLUG}"). ${manifest.features.length} feature(s) onto ${buildBranch}. Test cmd: ${testCommand}`)
+const checkCommand = (manifest.checkCommand ?? '').trim()
+const checkGateText = checkCommand
+  ? `the repo's typecheck/build gate (\`${checkCommand}\`)`
+  : 'the repo\'s typecheck/build gate (discover it from the repo — e.g. `pnpm -r typecheck && pnpm -r build`, `cargo check`, `go build ./...`, `mypy` — or establish one if your feature introduces the toolchain)'
+log(`Approved: ${manifest.iterationName} (slug "${ITERATION_SLUG}"). ${manifest.features.length} feature(s) onto ${buildBranch}. Test cmd: ${testCommand}; check gate: ${checkCommand || '(discover/establish)'}`)
+
+// REMOTE PREFLIGHT: a missing remote doesn't waste build work (everything lands
+// locally), but discovering it at the final push turns "MR open" into "stopped
+// short" — surface it NOW so the human can add a remote while the build runs.
+if (manifest.remoteConfigured === false) {
+  log(`⚠️ NO PUSHABLE GIT REMOTE (${manifest.remoteNote ?? 'git remote -v is empty'}). The build will complete locally but CANNOT push or open the MR. Add a remote before convergence (e.g. \`git remote add origin <url>\`).`)
+}
 
 // SPECIALIST ROUTING (Opus reasons / Sonnet builds is the MODEL tier; the agent
 // TYPE adds domain taste on top). plan-iteration tags each feature with a
@@ -389,8 +424,10 @@ function agentsFor(f) {
   const withDeps = fs.filter((f) => (f.after ?? []).length > 0).length
   const independents = fs.length - withDeps
   // "mostly serial" heuristic: at most one feature can start at the front.
+  // Serial is SAFE now (it stacks on the shared trunk worktree — no branch
+  // sprawl, deps' code always present); this warning is about WALL-CLOCK only.
   if (fs.length >= 3 && independents <= 1) {
-    log(`⚠️ This plan is effectively SERIAL: ${independents} feature(s) can start once contracts are frozen, ${withDeps} wait on deps. Expect roughly one-feature-at-a-time wall-clock. If a waiting feature only CONSUMES a frozen contract (not another feature's runtime behavior), its \`after\` is over-declared — it should fork from the contract barrier and run concurrently. Consider re-planning to minimize hard deps.`)
+    log(`⚠️ This plan is effectively SERIAL: ${independents} feature(s) can start once contracts are frozen, ${withDeps} wait on deps. Serial work builds safely on the shared trunk, but wall-clock is one-feature-at-a-time. If a waiting feature only CONSUMES a frozen contract (not another feature's runtime behavior), its \`after\` is over-declared — dropping the edge lets it run concurrently.`)
   }
 }
 
@@ -405,13 +442,13 @@ function agentsFor(f) {
 phase('Contract barrier')
 
 const barrier = await agent(
-  `You are landing the frozen shared contracts, BEFORE any feature work. Create the build branch \`${buildBranch}\` in its OWN NEW WORKTREE: \`git worktree add ${WORKTREE_DIR}/contracts -b ${buildBranch} <main/default>\`, working ENTIRELY inside \`${WORKTREE_DIR}/contracts\`. NEVER \`git checkout\`/\`switch\` the primary worktree — the human is working there on main, live; changing its branch yanks files out from under them. (This iteration's worktrees all nest under \`${WORKTREE_DIR}/\` so concurrent iterations never collide.) Implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), and commit.
+  `You are landing the frozen shared contracts, BEFORE any feature work. Create the build branch \`${buildBranch}\` in its OWN NEW WORKTREE: \`git worktree add ${TRUNK_WORKTREE} -b ${buildBranch} <main/default>\`, working ENTIRELY inside \`${TRUNK_WORKTREE}\`. This worktree PERSISTS as the iteration's primary build worktree — serial features build directly in it after you, so leave it clean and do not remove it. NEVER \`git checkout\`/\`switch\` the primary worktree — the human is working there on main, live; changing its branch yanks files out from under them. (This iteration's worktrees all nest under \`${WORKTREE_DIR}/\` so concurrent iterations never collide.) Implement the minimum-viable form of EVERY contract below, pre-commit EVERY feature's additive extension TOGETHER with every consumer that must stay exhaustive over it (so no switch/validator/provider-schema breaks when features land), and commit.
 
 Before creating the worktree, ensure \`.claude/worktrees/\` is gitignored (it holds transient build trees that must never be committed): if it isn't already ignored, add it to \`.git/info/exclude\` (don't modify a tracked .gitignore unless the project clearly wants it there).
 
 Work in BATCHES to keep this fast — implement ALL the contract shapes and their exhaustive consumers FIRST (all the edits), THEN run tests, rather than running after each shape. The contract shapes are type/schema definitions; you know them up front from the list below, so there is little to "discover" by testing incrementally.
 
-TOOL-USE BUDGET (a hard efficiency target): after all the edits are in place, run ONLY the tests that exercise these contract shapes + their exhaustive consumers (the named source-of-truth files and their direct test targets) — NOT the whole suite (that runs once at convergence). Run that scoped set ONCE; if anything failed, read ALL the failures from that one run, fix them together, and re-run ONCE to confirm. Aim for ~1–2 test runs total, not a run-after-every-edit loop (the measured biggest waste in this pipeline). Quote the final green scoped result.
+TOOL-USE BUDGET (a hard efficiency target): after all the edits are in place, run ONLY the tests that exercise these contract shapes + their exhaustive consumers (the named source-of-truth files and their direct test targets) — NOT the whole suite (that runs once at convergence). Run that scoped set ONCE; if anything failed, read ALL the failures from that one run, fix them together, and re-run ONCE to confirm. Aim for ~1–2 test runs total, not a run-after-every-edit loop (the measured biggest waste in this pipeline). Then run ${checkGateText} ONCE if the toolchain exists at this point — transpile-only test runners miss type errors and packaging breaks. Quote the final green scoped result.
 
 You MUST NOT implement feature behavior — only the contract shapes + their exhaustive consumers.
 
@@ -433,17 +470,61 @@ log(`Contracts landed @ ${barrier.commitSha}. ${barrier.frozenSignatures.length}
 const frozenBrief = `The shared contracts are FROZEN and committed on \`${buildBranch}\` @ ${barrier.commitSha}. Consume these signatures WITHOUT modifying them. If you believe you need to change one, STOP and report it as contractDrift — never fork a local copy:\n\n${barrier.frozenSignatures.map((s) => `- ${s}`).join('\n')}`
 
 // === Phases 3–4: per-feature pipeline (Build -> Review) ====================
-// Each feature runs its OWN worktree-isolated workstream: a Sonnet build agent,
-// then an Opus reviewer, then (only if the reviewer confirms gating findings) a
-// Sonnet fixer; a conditional skeptic re-checks high-sev security/spec. A clean
-// feature costs 2 agents (Sonnet build + Opus review). Features self-schedule by
-// their hard-dep "after" edges — independents run concurrently, dependents wait;
-// no global barrier, no parallel/serial bookkeeping.
+// Features self-schedule by their hard-dep "after" edges. The DEFAULT home for
+// a feature is the TRUNK — the iteration's one shared build worktree on
+// build/<slug> — built by a FRESH Sonnet agent (context isolation comes from
+// new agents, not new branches). A feature gets its OWN worktree only when
+// another feature currently owns the trunk (genuine parallelism); it forks
+// from the last STABLE trunk sha and is folded back by cherry-pick once
+// reviewed-shippable. Dependents therefore always build on their deps' actual
+// landed code. A clean trunk feature costs 2 agents (Sonnet build + Opus
+// review) and creates ZERO branches/worktrees.
 
 const byId = new Map()
 const featureResultPromises = new Map()
 
-// Build one feature (TDD all chunks + app-driving QA) in its own worktree.
+// --- Trunk bookkeeping ------------------------------------------------------
+// trunkTip: the last sha on build/<slug> whose features are ALL reviewed-
+// shippable — parallel features fork from here, and converge cuts the
+// integration branch here. It advances only on shippable outcomes.
+// trunkBusy: a builder/reviewer/fixer/fold currently owns the trunk worktree.
+// trunkContaminated: a blocked feature's commits sit past trunkTip on the
+// trunk — from then on every feature builds in a parallel worktree from
+// trunkTip and nothing more is folded (converge cuts at trunkTip; the
+// contaminated commits stay on build/<slug> for the human).
+let trunkTip = barrier.commitSha
+let trunkBusy = false
+let trunkContaminated = false
+const trunkWaiters = []
+function tryAcquireTrunk() {
+  if (trunkBusy || trunkContaminated) return false
+  trunkBusy = true
+  return true
+}
+async function acquireTrunk() {
+  while (trunkBusy) await new Promise((r) => trunkWaiters.push(r))
+  trunkBusy = true
+}
+function releaseTrunk() {
+  trunkBusy = false
+  const w = trunkWaiters.shift()
+  if (w) w()
+}
+
+// Shippable is decided from the raw build+review outcome: tests green, the
+// typecheck/build gate green, no unresolved gating finding, no contract drift.
+function isShippable(r) {
+  return (
+    r?.build?.allTestsGreen === true &&
+    r?.build?.checkGreen !== false &&
+    (r?.unresolvedGating?.length ?? 0) === 0 &&
+    !r?.contractDrift
+  )
+}
+
+// Build one feature (TDD all chunks + app-driving QA). mode 'trunk' = directly
+// on build/<slug> in the shared trunk worktree; mode 'parallel' = own worktree
+// forked from the last stable trunk sha.
 // SONNET builds every feature: the approved per-spec plan is detailed enough to
 // carry it, even for high-stakes work. Opus is reserved for the review pass. When
 // the plan tagged the feature with a stack, the builder runs as that stack's
@@ -455,12 +536,21 @@ const featureResultPromises = new Map()
 // chunk, run its impacted tests ONCE, commit ONCE, move on. App-driving QA is
 // ONCE at the end over the finished feature, not per chunk. Same TDD discipline,
 // an order of magnitude fewer shell round-trips.
-async function buildFeature(f) {
+async function buildFeature(f, mode, baseSha) {
   const { builder } = agentsFor(f)
-  const opts = { label: `build:${f.id}`, phase: 'Build', schema: BUILD_SCHEMA, model: 'sonnet', isolation: 'worktree' }
+  const opts = { label: `build:${f.id}${mode === 'trunk' ? '' : ':par'}`, phase: 'Build', schema: BUILD_SCHEMA, model: 'sonnet' }
   if (builder) opts.agentType = builder
+  // Parallel builders get harness worktree isolation as belt-and-suspenders;
+  // trunk builders MUST share real state, so no isolation flag for them.
+  if (mode !== 'trunk') opts.isolation = 'worktree'
+  const where =
+    mode === 'trunk'
+      ? `DIRECTLY on the iteration build branch \`${buildBranch}\` in the EXISTING shared build worktree \`${TRUNK_WORKTREE}\` — do NOT create a new worktree or branch; you have exclusive ownership of this worktree for the duration of this feature, and every shipped dependency's code is already on the branch. FIRST run \`git rev-parse HEAD\` there (expected ${baseSha}) and treat that sha as your diff base.`
+      : `in its OWN NEW git worktree (the trunk is busy with another feature): \`git worktree add ${WORKTREE_DIR}/${f.id.toLowerCase()} -b feat/${f.id.toLowerCase()} ${baseSha}\` — forked from the trunk's last STABLE sha ${baseSha}, so every shipped dependency's code is present. Work ENTIRELY inside \`${WORKTREE_DIR}/${f.id.toLowerCase()}\`. Your branch is folded back onto the trunk after review.`
   return agent(
-    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end in its OWN NEW git worktree: \`git worktree add ${WORKTREE_DIR}/${f.id.toLowerCase()} -b feat/${f.id.toLowerCase()} ${buildBranch}\` (forked from \`${buildBranch}\` @ ${barrier.commitSha}, which carries the frozen contracts). Work ENTIRELY inside \`${WORKTREE_DIR}/${f.id.toLowerCase()}\`. NEVER \`git checkout\`/\`switch\` the primary worktree — the human works there on main, live. All of this iteration's worktrees nest under \`${WORKTREE_DIR}/\` so a concurrently-building iteration never collides with yours.
+    `You are building feature ${f.id} ("${f.title ?? ''}") end-to-end, ${where} NEVER \`git checkout\`/\`switch\` the primary worktree — the human works there on main, live. All of this iteration's worktrees nest under \`${WORKTREE_DIR}/\` so a concurrently-building iteration never collides with yours.
+
+BUILD ON WHAT EXISTS. Your dependencies' code is in this checkout — read it and extend it. NEVER re-create a service, schema, router, or module that already exists because you imagined a different base: if something you expected is missing, that is a BLOCKER to report (in contractDrift or deferredCheckboxes), not a gap to fill by inventing your own foundation.
 
 ${frozenBrief}
 
@@ -472,7 +562,8 @@ TOOL-USE BUDGET (a hard efficiency target, not a suggestion): aim for roughly ON
 3. Tick the chunk's checkbox in the spec and commit the chunk as ONE commit (Conventional Commits) — one commit per chunk, not per file. If a chunk is genuinely tiny, fold it into the next commit; granular means per-chunk, not per-edit.
 
 Repeat for every chunk. Then, ONCE, after the whole feature is built and all chunk tests are green:
-4. VERIFY against the RUNNING system, not just the tests${SKIP_APP_SMOKE ? ' (app-driving QA is globally skipped for this run — cover via integration tests and note "smoke skipped")' : ': drive the real app/CLI/endpoint ONE TIME over the finished feature (use Chrome DevTools or Playwright MCP for a UI, run the binary for a CLI, curl the endpoint for a service — ' + (manifest.runAppHint ?? 'discover how the app runs') + ') and quote the observed evidence (HTTP status / DOM state / screenshot ref / output line). Do this once at the end, not per chunk'}. If the feature genuinely cannot be exercised end-to-end yet because it sits behind an unbuilt caller, say so explicitly — defer deliberately, never skip silently.
+4. GATE: run ${checkGateText} ONCE over the finished feature. Impacted unit tests alone provably miss type errors, undeclared dependencies, and packaging breaks (a tests-green feature once shipped package exports pointing at src/*.ts and crashed the built container). It must pass — set checkGreen and quote the result in checkEvidence.
+5. VERIFY against the RUNNING system, not just the tests${SKIP_APP_SMOKE ? ' (app-driving QA is globally skipped for this run — cover via integration tests and note "smoke skipped")' : ': drive the real app/CLI/endpoint ONE TIME over the finished feature (use Chrome DevTools or Playwright MCP for a UI, run the binary for a CLI, curl the endpoint for a service — ' + (manifest.runAppHint ?? 'discover how the app runs') + ') and quote the observed evidence (HTTP status / DOM state / screenshot ref / output line). Do this once at the end, not per chunk'}. If the feature genuinely cannot be exercised end-to-end yet because it sits behind an unbuilt caller, say so explicitly — defer deliberately, never skip silently.
 
 Record decisions + rationale into the spec's Implementation-notes as you go (in the same per-chunk commit — don't make a separate commit for notes).
 
@@ -480,8 +571,34 @@ CODE COMMENTS DESCRIBE WHAT THE CODE DOES AND WHY IT EXISTS — NEVER THE PROCES
 
 If you hit a contract gap — you think a frozen signature must change — STOP and report it in \`contractDrift\`; do not improvise a contract change. Every test you ran must end GREEN (no pending/failing).
 
-Return the structured build result with quoted test + QA evidence (the impacted-test result, not a full-suite run), your branch, your worktree path, the commits, and — so the reviewer diffs ONCE against the right base instead of re-deriving it — set \`diffRange\` to \`${barrier.commitSha}..HEAD\` and \`changedFiles\` to the output of \`git diff --name-only ${barrier.commitSha}..HEAD\`.`,
+Return the structured build result with quoted test + check-gate + QA evidence (the impacted-test result, not a full-suite run), your branch, your worktree path, the commits, \`headSha\` = \`git rev-parse HEAD\` after your final commit, and — so the reviewer diffs ONCE against the right base instead of re-deriving it — set \`diffRange\` to \`<your diff base>..HEAD\` (the base you recorded at the start; expected ${baseSha}) and \`changedFiles\` to \`git diff --name-only\` over that range.`,
     opts,
+  )
+}
+
+// Fold a reviewed-shippable PARALLEL feature back onto the trunk so dependents
+// and converge see its code on build/<slug>. Cherry-pick only — linear history.
+const FOLD_SCHEMA = {
+  type: 'object',
+  required: ['folded', 'headSha'],
+  properties: {
+    folded: { type: 'boolean' },
+    headSha: { type: 'string', description: 'trunk HEAD after the fold; the UNCHANGED prior tip if folded=false' },
+    conflictNote: { type: 'string', description: 'when folded=false: the specific semantic contradiction that made the cherry-pick unresolvable' },
+    testEvidence: { type: 'string', description: 'quoted green impacted-test (+ check gate) result on the trunk after folding' },
+  },
+}
+
+async function foldOntoTrunk(result) {
+  return agent(
+    `Fold the reviewed-shippable feature ${result.featureId} back onto the iteration build branch. Work in the EXISTING shared build worktree \`${TRUNK_WORKTREE}\` (branch \`${buildBranch}\`, currently @ ${trunkTip}); you have exclusive ownership of it for this fold. NEVER \`git checkout\`/\`switch\` the primary worktree.
+
+Cherry-pick the feature's commits: \`git cherry-pick ${(result.build?.diffRange || `${trunkTip}..HEAD`).split('..')[0]}..${result.branch}\`. LINEAR HISTORY — never \`git merge\`. Resolve ordinary textual conflicts in place (the plan pre-reconciled the shared contracts; "whoever lands second reconciles" is your job, not grounds for bailing). After the picks land, run the feature's impacted tests ONCE${checkCommand ? ` and \`${checkCommand}\` ONCE` : ' and the repo check gate ONCE if one exists'} — green required; quote it.
+
+ONLY a genuinely UNRESOLVABLE SEMANTIC conflict (the trunk and this feature need contradictory logic in the same place that no resolution reconciles) stops you: then \`git cherry-pick --abort\`, verify the trunk is back at ${trunkTip} exactly, and return folded=false with the specific contradiction in conflictNote. Never leave the trunk mid-cherry-pick.
+
+Return folded, the trunk's new headSha (\`git rev-parse HEAD\`), and the quoted test evidence.`,
+    { label: `fold:${result.featureId}`, phase: 'Build', schema: FOLD_SCHEMA, model: 'sonnet' },
   )
 }
 
@@ -503,6 +620,7 @@ async function reviewFeature(build, f) {
   let cleanRounds = 0
   const allConfirmed = []
   let lastFixSummary = ''
+  let finalSha = build.headSha || null // advanced by fixer commits; trunk/fold bookkeeping reads it
   const fixedIdsAll = new Set()
 
   while (round < MAX_REVIEW_ROUNDS && cleanRounds < 1) {
@@ -573,11 +691,12 @@ For EACH finding: read the cited code to CONFIRM it is real before reporting it;
 
 ${toFix.map((x) => `[id ${x._fid}] ${x.dimension}/${x.severity}: ${x.title}\n  where: ${x.evidence}\n  fix: ${x.fix ?? '(apply the minimal correct fix at the cited location)'}`).join('\n\n')}
 
-After the edits, run ONLY the impacted tests (the ones covering the files you touched) until GREEN — not the whole suite. ${frozenBrief}\n\nDo NOT modify any frozen contract signature; if a fix seems to need one, leave that id in \`unfixedIds\` and report it (don't force it). Keep code comments timeless — never reference a feature ID, the build plan, or any process artifact. Commit with Conventional Commits (type \`fix\`). Return which ids you fixed, which you couldn't, a one-line fixSummary, and the quoted green impacted-test result.`,
+After the edits, run ONLY the impacted tests (the ones covering the files you touched) until GREEN — not the whole suite. ${frozenBrief}\n\nDo NOT modify any frozen contract signature; if a fix seems to need one, leave that id in \`unfixedIds\` and report it (don't force it). Keep code comments timeless — never reference a feature ID, the build plan, or any process artifact. Commit with Conventional Commits (type \`fix\`). Return which ids you fixed, which you couldn't, a one-line fixSummary, the quoted green impacted-test result, and \`headSha\` = \`git rev-parse HEAD\` after your commits.`,
         { label: `fix:${f.id}:r${round}`, phase: 'Review', schema: FIX_RESULT_SCHEMA, model: 'sonnet' },
       )
       for (const id of fix?.fixedIds ?? []) fixedIdsAll.add(String(id))
       if (fix?.fixSummary) lastFixSummary = String(fix.fixSummary).slice(0, 500)
+      if (fix?.headSha) finalSha = fix.headSha
     }
 
     // A round is "clean" (stop looping) when no gating finding remains
@@ -612,6 +731,7 @@ After the edits, run ONLY the impacted tests (the ones covering the files you to
     title: f.title ?? '',
     roundsRun: round,
     build,
+    finalSha,
     confirmedFindings: allConfirmed,
     unresolvedGating,
     lastFixSummary,
@@ -628,12 +748,72 @@ function runFeature(f) {
   if (featureResultPromises.has(f.id)) return featureResultPromises.get(f.id)
   const deps = (f.after ?? []).map((id) => byId.get(id)).filter(Boolean)
   const p = (async () => {
+    // GUARDRAIL — never build on a guessed base: a dependent runs ONLY if every
+    // hard dep actually shipped (reviewed-shippable AND its code is on the
+    // trunk). Building anyway was the measured worst failure: the builder
+    // invents the missing foundation, every token is wasted, and the result is
+    // an unmergeable fork. Skip loudly instead; the human re-plans.
     if (deps.length) {
-      // Wait for hard-dep features to finish (their shipped behavior is consumed).
-      await Promise.all(deps.map((d) => runFeature(d)))
+      const depResults = await Promise.all(deps.map((d) => runFeature(d)))
+      const bad = deps.filter((d, i) => {
+        const r = depResults[i]
+        return !r || r.skipped || !isShippable(r) || r.onTrunk === false
+      })
+      if (bad.length) {
+        const reason = `hard dep(s) ${bad.map((d) => d.id).join(', ')} did not ship — skipped rather than built on a guessed base`
+        log(`⛔ ${f.id} SKIPPED: ${reason}`)
+        return { featureId: f.id, specPath: f.specPath, title: f.title ?? '', skipped: true, skipReason: reason }
+      }
     }
-    const build = await buildFeature(f)
-    const result = await reviewFeature(build, f)
+
+    // WHERE to build: the trunk by default (serial work needs no extra branch/
+    // worktree — a fresh agent per feature is the context isolation); a parallel
+    // worktree only when another feature currently owns the trunk.
+    const onTrunk = tryAcquireTrunk()
+    const baseSha = trunkTip
+    let result = null
+    try {
+      const build = await buildFeature(f, onTrunk ? 'trunk' : 'parallel', baseSha)
+      result = await reviewFeature(build, f)
+    } finally {
+      if (onTrunk) {
+        if (result && isShippable(result)) {
+          if (result.finalSha) trunkTip = result.finalSha
+        } else {
+          trunkContaminated = true
+          log(`⚠️ ${f.id} did not ship ON the trunk — build/<slug> past ${trunkTip} is contaminated; every later feature builds in a parallel worktree from ${trunkTip} and converge cuts the integration branch there. The contaminated commits stay on the build branch for the human.`)
+        }
+        releaseTrunk()
+      }
+    }
+    if (!result) return null
+    result.mode = onTrunk ? 'trunk' : 'parallel'
+    result.onTrunk = onTrunk
+
+    // A shippable PARALLEL feature folds back onto the trunk so its dependents
+    // (and converge) see its code on build/<slug>.
+    if (!onTrunk && isShippable(result)) {
+      if (trunkContaminated) {
+        result.onTrunk = false
+        result.foldNote = 'trunk contaminated by an earlier blocked feature — left on its own branch for the human'
+        log(`⚠️ ${f.id} is shippable but NOT folded (contaminated trunk); branch ${result.branch} preserved.`)
+      } else {
+        await acquireTrunk()
+        try {
+          const fold = await foldOntoTrunk(result)
+          if (fold?.folded) {
+            trunkTip = fold.headSha || trunkTip
+            result.onTrunk = true
+          } else {
+            result.onTrunk = false
+            result.foldNote = fold?.conflictNote || 'fold failed'
+            log(`⛔ ${f.id} fold onto trunk FAILED (${result.foldNote}) — left out, branch ${result.branch} preserved for the human.`)
+          }
+        } finally {
+          releaseTrunk()
+        }
+      }
+    }
     return result
   })()
   featureResultPromises.set(f.id, p)
@@ -644,11 +824,13 @@ phase('Build') // Build/Review interleave per feature via opts.phase on each age
 const featureResults = (await Promise.all(manifest.features.map((f) => runFeature(f)))).filter(Boolean)
 
 // === Phase 5: Converge =====================================================
-// ONE Opus integrator does the whole finalization: assemble the shippable
-// branches onto ONE integration branch by cherry-pick/rebase (zero merge commits
-// — linear history mandatory, verified with `git log --merges`), run the ONE
-// full-suite pass + an end-to-end smoke, AMEND each feature's outcome into its
-// spec + update STATUS.md + propagate durable lessons, then push + open ONE MR
+// ONE Opus integrator does the whole finalization. There is NO assembly step
+// anymore: every shipped feature is already on the trunk (built there, or
+// folded back by cherry-pick), so the integrator CUTS integration/<slug> at the
+// verified trunkTip — linear by construction, verified with `git log --merges`
+// — runs the typecheck/build gate + the ONE full-suite pass + an end-to-end
+// smoke, AMENDS each feature's outcome into its spec (including skipped ones) +
+// updates STATUS.md + propagates durable lessons, then pushes + opens ONE MR
 // (does NOT merge it). Returns the MR URL to the USER only (never a tracked file).
 //
 // Why folded (was a separate Sonnet "record" agent): the record step re-Read every
@@ -668,24 +850,22 @@ const featureResults = (await Promise.all(manifest.features.map((f) => runFeatur
 
 phase('Converge')
 
-// Shippable is computed here from the raw review outcome (no per-feature verdict
-// agent): a feature is shippable iff its build tests were green, it has no
-// unresolved gating finding, and no unreported contract drift.
-function isShippable(r) {
-  return r.build?.allTestsGreen === true && (r.unresolvedGating?.length ?? 0) === 0 && !r.contractDrift
-}
-const shippable = featureResults.filter(isShippable)
-const blocked = featureResults.filter((r) => !isShippable(r))
+// Outcomes (isShippable is defined with the trunk bookkeeping above):
+// shipped = reviewed-shippable AND on the trunk (built there, or folded back);
+// blocked = built but not shippable, or shippable-but-unfoldable;
+// skipped = never built because a hard dep did not ship.
+const shippable = featureResults.filter((r) => !r.skipped && isShippable(r) && r.onTrunk !== false)
+const blocked = featureResults.filter((r) => !r.skipped && (!isShippable(r) || r.onTrunk === false))
+const skippedFeatures = featureResults.filter((r) => r.skipped)
 
 const convergence = await agent(
-  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts are on \`${buildBranch}\` @ ${barrier.commitSha}; each SHIPPABLE feature built on its own \`feat/<id>\` branch off that. You finalize AUTONOMOUSLY — assemble, verify, record outcomes, push, open ONE MR. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). You do NOT tear down worktrees — a deterministic post-step does that from the \`shipped\` list you return. The only thing that stops you is a real cherry-pick conflict needing human judgment.
+  `You are the integrator finalizing the iteration "${manifest.iterationName}". The frozen contracts and EVERY shipped feature are already on the trunk \`${buildBranch}\` — serial features built directly on it and parallel ones were folded back by cherry-pick — so there is NOTHING to assemble. The verified trunk tip is ${trunkTip}${trunkContaminated ? ` (the trunk is CONTAMINATED past that sha by a blocked feature's commits — they stay on \`${buildBranch}\` for the human; do not include them)` : ''}. You finalize AUTONOMOUSLY — verify, record outcomes, push, open ONE MR. Do NOT wait for the human and do NOT merge into the default branch (the human merges the MR). You do NOT tear down worktrees — a deterministic post-step does that from the \`shipped\` list you return.
 
-1. ASSEMBLE the SHIPPABLE feature branches (below) onto an iteration-scoped integration branch \`integration/${ITERATION_SLUG}\` in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${buildBranch}\` (scoped so a concurrent iteration never collides). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. Ship SHIPPABLE features only; leave any blocked feature OUT (its branch/worktree stays untouched for the human).
-   LINEAR HISTORY IS MANDATORY — ZERO merge commits. Assemble ONLY by cherry-picking each shippable feature's commits in dependency order (\`git cherry-pick\`), or \`git rebase --onto\`. NEVER \`git merge\` (and never \`cherry-pick -m\`) — a merge commit is a failure. Resolve predicted convergence in place as ordinary commits. A SHIPPABLE feature is NEVER left out for a TEXTUAL or PREDICTED cherry-pick conflict — the plan already anticipated these ("whoever merges second rebases"), so reconciling them in place IS your job, not grounds for bailing; rebase/resolve and carry on. The ONLY thing that may stop a shippable feature is a genuinely UNRESOLVABLE SEMANTIC conflict (two features need contradictory logic in the same place that no rebase can reconcile) — and then it is a HARD FAILURE, not a quiet drop: set its \`blockedReason\` to the specific contradiction and surface it loudly in your return so the human sees a flagged problem, never a silently-shrunk MR. Shipping ONE MR with ALL reviewed-clean work is the contract; a feature that passed review must land. VERIFY linearity: \`git log --merges ${buildBranch}..integration/${ITERATION_SLUG}\` MUST print nothing; quote the empty result in \`linearHistoryProof\`.
-2. Run the FULL integrated suite (\`${testCommand}\`) on the assembled branch — this is the ONE full-suite run (the per-feature build + fix steps ran only impacted tests). Fix any failures here: a failure now is an integration break the scoped runs couldn't see. The suite MUST end green before you push.
+1. CUT the integration branch at the verified trunk tip in a NEW worktree: \`git worktree add ${WORKTREE_DIR}/integration -b integration/${ITERATION_SLUG} ${trunkTip}\` (scoped so a concurrent iteration never collides). Work entirely in that worktree — NEVER \`git checkout\`/\`switch\` the primary worktree, the human works there on main. VERIFY each shipped feature's commits are present (\`git log\` over each feature's diffRange shas) and that history is linear by construction: \`git log --merges ${barrier.commitSha}..HEAD\` MUST print nothing; quote the empty result in \`linearHistoryProof\`. Blocked/skipped features are absent from this branch by construction — never try to pull them in.
+2. Run ${checkGateText} ONCE, then the FULL integrated suite (\`${testCommand}\`) on the branch — this is the ONE full-suite run (the per-feature build + fix steps ran only impacted tests). Fix any failures here: a failure now is an integration break the scoped runs couldn't see. Both MUST end green before you push.
 3. ${SKIP_APP_SMOKE ? 'App smoke skipped this run — rely on the integrated suite.' : `Run ONE end-to-end smoke of the assembled app (${manifest.runAppHint ?? 'how a user runs it'}): exercise the iteration's primary new path + one neighbouring existing path (regression check). Quote the observed evidence in \`smokeEvidence\`.`} DEFINITION OF DONE — trace to the PRD, not just the spec: for each shipped feature, confirm it observably satisfies the PRD acceptance criteria it traces to (the spec's "Requirements traced" links them; the PRD's section 6 criteria are written as Given/When/Then assertions). A feature whose spec boxes are ticked but whose PRD criterion isn't met is NOT done — treat it as left-out, not shipped.
 4. RECORD THE OUTCOMES (do this BEFORE pushing, so they land in the initial MR — you already have these files open from assembly, so this is a few quick edits, not a re-investigation):
-   a. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC. For each feature (shipped AND left-out), append a short "### Build outcome" note under that spec's "## Build plan (approved)" section: shippable y/n, acceptance status, any unresolved gating finding, deferred items, and a one-line QA evidence quote. Keep it tight — this is the durable record. Insert the note, leave every other byte unchanged. Do NOT reference ephemeral build-process internals in code — only in spec/commit text.
+   a. AMEND EACH FEATURE'S OUTCOME INTO ITS OWN SPEC. For each feature (shipped, left-out, AND skipped), append a short "### Build outcome" note under that spec's "## Build plan (approved)" section: shippable y/n (or "skipped: <reason>" for features never built because a hard dep didn't ship), acceptance status, any unresolved gating finding, deferred items, and a one-line QA evidence quote. Keep it tight — this is the durable record. Insert the note, leave every other byte unchanged. Do NOT reference ephemeral build-process internals in code — only in spec/commit text.
    b. UPDATE \`docs/STATUS.md\` if it exists: mark this iteration's shipped features shipped and any left-out ones blocked; set the "Now"/"What's next" lines to reflect reality (the next iteration to plan/build, noting any that can run concurrently). Keep it terse. If it doesn't exist, skip it.
    c. PROPAGATE DURABLE LESSONS — only if material (don't manufacture them): a lesson that changes the design → a new superseding ADR under docs/adrs/ or ARCHITECTURE.md; that changes the plan → ROADMAP.md; about how to build in this repo → CLAUDE.md. "Nothing material" is a valid outcome.
    Commit these spec/STATUS/doc edits on the integration branch (Conventional Commits, e.g. \`docs: record ${ITERATION_SLUG} build outcomes\`) — stage ONLY the files you changed, never \`git add -A\`.
@@ -694,8 +874,9 @@ const convergence = await agent(
    - \`shipped\`: the feature ids whose commits you VERIFIED are present on \`integration/${ITERATION_SLUG}\` (do a \`git log\`/\`git cherry\` check — only ids you confirmed). \`leftOut\`: the blocked/conflicting ids whose worktrees must be PRESERVED. Do NOT remove any worktree or branch yourself.
    - \`learned\`: the TEACHING version of what building taught (2-4 plain sentences for the human) — the footgun, the perf cliff, the contract that needed another variant, the assumption that broke. Returned to the human, not written to a file.
 
-Preliminary shippable (tests green, no unresolved gating — cherry-pick + ship these): ${JSON.stringify(shippable.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath, title: r.title })), null, 2)}
-Preliminary blocked (leave OUT, preserve worktrees): ${JSON.stringify(blocked.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath, unresolvedGating: r.unresolvedGating })), null, 2)}`,
+Shipped — already ON the trunk at ${trunkTip}; verify their commits are present: ${JSON.stringify(shippable.map((r) => ({ id: r.featureId, mode: r.mode, diffRange: r.build?.diffRange, specPath: r.specPath, title: r.title })), null, 2)}
+Blocked (NOT on the integration branch; preserve their branches/worktrees): ${JSON.stringify(blocked.map((r) => ({ id: r.featureId, branch: r.branch, specPath: r.specPath, foldNote: r.foldNote ?? null, unresolvedGating: r.unresolvedGating })), null, 2)}
+Skipped (never built — record the reason in their specs): ${JSON.stringify(skippedFeatures.map((r) => ({ id: r.featureId, specPath: r.specPath, skipReason: r.skipReason })), null, 2)}`,
   { label: 'integrate', phase: 'Converge', schema: CONVERGE_SCHEMA, model: 'opus' },
 )
 
@@ -711,15 +892,20 @@ Preliminary blocked (leave OUT, preserve worktrees): ${JSON.stringify(blocked.ma
 // (never `leftOut`/blocked). A dedicated agent runs the git commands so it can
 // re-verify each commit is present before deleting and report what it did.
 const shipped = Array.isArray(convergence?.shipped) ? convergence.shipped : []
-const leftOut = Array.isArray(convergence?.leftOut) ? convergence.leftOut : blocked.map((r) => r.featureId)
+const leftOut = Array.isArray(convergence?.leftOut) ? convergence.leftOut : [...blocked, ...skippedFeatures].map((r) => r.featureId)
+// Only PARALLEL-built features created worktrees/branches; trunk features have
+// nothing of their own to tear down. The trunk worktree itself goes only when
+// it holds no un-collected work (not contaminated, nothing blocked on it).
+const parallelShippedIds = shippable.filter((r) => r.mode === 'parallel' && shipped.includes(r.featureId)).map((r) => r.featureId)
+const removeTrunkWorktree = !trunkContaminated && blocked.length === 0
 let teardown = null
 if (convergence?.mrOpened && !convergence?.pushError && shipped.length) {
   teardown = await agent(
     `Tear down the transient build scaffolding for iteration "${manifest.iterationName}" now that its MR is open. Work via git from the repo root; NEVER \`git checkout\`/\`switch\` the primary worktree (the human works there on main).
 
-For EACH shipped feature id [${shipped.join(', ')}]: FIRST re-verify its commits are present on \`integration/${ITERATION_SLUG}\` (\`git cherry\` / \`git log integration/${ITERATION_SLUG}\` — confirm before deleting; if a feature's commits are NOT there, do NOT delete it, report it under kept). Then for each confirmed one: \`git worktree remove ${WORKTREE_DIR}/<id-lowercased>\` and \`git branch -D feat/<id-lowercased>\`.
-Also remove the contract worktree \`${WORKTREE_DIR}/contracts\` (its commits are on \`${buildBranch}\`, which integration was cut from).
-KEEP, do NOT touch: the integration worktree/branch \`${WORKTREE_DIR}/integration\` (holds the pushed branch), \`${buildBranch}\`, and every LEFT-OUT/blocked feature's worktree+branch [${leftOut.join(', ') || 'none'}] (un-collected work — never delete it).
+${parallelShippedIds.length ? `For EACH parallel-built shipped feature id [${parallelShippedIds.join(', ')}] (the only ones with their own scaffolding — trunk-built features created none): FIRST re-verify its commits are present on \`integration/${ITERATION_SLUG}\` (\`git cherry\` / \`git log\` — confirm before deleting; if a feature's commits are NOT there, do NOT delete it, report it under kept). Then for each confirmed one: \`git worktree remove ${WORKTREE_DIR}/<id-lowercased>\` and \`git branch -D feat/<id-lowercased>\`.` : 'No parallel feature worktrees exist (everything built on the trunk) — nothing per-feature to remove.'}
+${removeTrunkWorktree ? `Remove the trunk worktree \`${TRUNK_WORKTREE}\` (keep the \`${buildBranch}\` BRANCH — only the worktree goes; its commits are on the pushed integration branch).` : `KEEP the trunk worktree \`${TRUNK_WORKTREE}\` and the \`${buildBranch}\` branch — they hold un-collected (blocked/contaminated) work the human still needs.`}
+KEEP, do NOT touch: the integration worktree/branch \`${WORKTREE_DIR}/integration\` (holds the pushed branch), the \`${buildBranch}\` branch, and every LEFT-OUT/blocked feature's worktree+branch [${leftOut.join(', ') || 'none'}] (un-collected work — never delete it).
 
 Report exactly which worktrees + branches you removed and which you kept.`,
     { label: 'teardown', phase: 'Converge', model: 'sonnet', schema: {
@@ -739,7 +925,7 @@ Report exactly which worktrees + branches you removed and which you kept.`,
 const mrLine = convergence?.mrUrl
   ? `MR: ${convergence.mrUrl}`
   : (convergence?.pushError ? `MR NOT opened — ${convergence.pushError} (branch integration/${ITERATION_SLUG} is local; finish the push/MR by hand)` : 'MR status unknown — check the converge output')
-log(`Build complete. ${shipped.length} shipped, ${leftOut.length} left out. ${mrLine}`)
+log(`Build complete. ${shipped.length} shipped, ${blocked.length} blocked, ${skippedFeatures.length} skipped (unbuilt — dep didn't ship). ${mrLine}`)
 // Cost visibility: rough output-token spend for this build run (shared turn pool).
 try { log(`Spend: ~${Math.round(budget.spent() / 1000)}k output tokens so far this turn (${manifest.features.length} feature(s) built + reviewed).`) } catch {}
 
@@ -749,12 +935,15 @@ return {
   buildBranch,
   worktreeDir: WORKTREE_DIR,
   contractCommit: barrier.commitSha,
+  trunkTip,
+  trunkContaminated,
   integrationBranch: convergence?.integrationBranch ?? `integration/${ITERATION_SLUG}`,
   mrOpened: convergence?.mrOpened === true,
   mrUrl: convergence?.mrUrl ?? null, // returned to the user; never written to a file
   pushError: convergence?.pushError ?? null,
   shipped,
   leftOut,
+  skipped: skippedFeatures.map((r) => ({ id: r.featureId, reason: r.skipReason })),
   suiteGreen: convergence?.suiteGreen === true,
   summary: convergence?.summary ?? '',
   // What building taught the human — relay this to them, it's the build's

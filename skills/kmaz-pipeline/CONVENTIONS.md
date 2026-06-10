@@ -102,6 +102,14 @@ then re-run once — a `write→run→fix-all→run` rhythm (~1–2 runs per chu
 build/contract agents an explicit tool-use budget (≈one test-run and one commit per chunk) so they
 self-monitor; the instruction "run until green" without a budget invites the per-edit loop.
 
+**A feature's exit gate runs the repo's typecheck/build once, not just impacted unit tests.**
+Transpile-only test runners (vitest/esbuild and kin) provably miss type errors, undeclared
+dependencies, and packaging breaks — a measured tests-green feature shipped package exports
+pointing at `src/*.ts` and crashed the built container. Impacted tests per chunk; one
+`typecheck && build` pass per feature; the full suite once at convergence. Long-running build
+workflows also **preflight the environment at load** (a pushable git remote exists, the toolchain
+runs) so a missing prerequisite surfaces in the first minute, not at the final push.
+
 **The multi-draft planning panel is the most expensive plan-phase step — reserve it.** A
 feature that escalates to the 3-independent-drafts-plus-synth panel costs ~4× a single-pass plan, so
 it fires RARELY and only where draft *diversity* genuinely earns it. The gate is two conditions, both
@@ -190,14 +198,26 @@ Freezing contracts early is what lets soft deps stay soft (features build agains
 shape instead of waiting). An unnamed shared shape is how concurrent work diverges — name every
 contract precisely and anchor it to its ADR.
 
-## Worktree isolation — the primary worktree is sacred
+## Worktree isolation — the primary worktree is sacred; worktrees are for parallelism, not ceremony
 
 The primary worktree (where the human works on `main`, live) is **never** touched or
-branch-switched by any autonomous stage. Every autonomous build/plan/integration step works in
-its OWN git worktree under `.claude/worktrees/<slug>/` on its own branch, created with
-`git worktree add` — never `git checkout`/`switch` on the primary. `.claude/worktrees/` must be
-gitignored (add to `.git/info/exclude` if the tracked `.gitignore` shouldn't be touched). Tear
-a worktree down once its work is collected (merged/cherry-picked), keeping any worktree that
+branch-switched by any autonomous stage. All autonomous build/plan/integration work happens in
+git worktrees under `.claude/worktrees/<slug>/`, created with `git worktree add` — never
+`git checkout`/`switch` on the primary. `.claude/worktrees/` must be gitignored (add to
+`.git/info/exclude` if the tracked `.gitignore` shouldn't be touched).
+
+**Worktrees buy two things only: isolation from the human, and genuine parallelism. They are NOT
+one-per-unit-of-work.** An iteration has ONE long-lived build worktree (the **trunk**) on
+`build/<slug>`; dependency-ordered (serial) work stacks directly on it, each unit built by a
+FRESH agent — context isolation comes from new agents, not new branches. An additional worktree
+is created only while two-plus units genuinely build at the same time; it forks from the last
+*stable* trunk sha and is folded back onto the trunk (cherry-pick, linear history) once its work
+is reviewed-shippable. A dependent unit builds only on top of its dependency's actual landed
+code — never from a bare base with the dep's code missing (the measured failure: the builder
+invents the missing foundation and the result is an unmergeable fork). If a hard dep did not
+ship, the dependent is **skipped loudly**, never built on a guess.
+
+Tear a worktree down once its work is collected (folded/merged), keeping any worktree that
 still holds un-collected (blocked) work. Interactive, turn-by-turn work with the human stays on
 the primary branch where you both are.
 
