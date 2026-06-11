@@ -458,7 +458,11 @@ Frozen contracts to land:
 ${JSON.stringify(manifest.frozenContracts, null, 2)}
 
 Use Conventional Commits. After committing, return: committed=true, the commit sha, the EXACT final signatures as committed (these brief every feature workstream so they consume the real shape), and the quoted green scoped-test result.`,
-  { label: 'contract-barrier', phase: 'Contract barrier', schema: BARRIER_SCHEMA, model: 'opus', isolation: 'worktree' },
+  // NO isolation:'worktree' here — the agent manages its own explicitly-named
+  // trunk worktree. Doubling up gave agents a second, non-convention harness
+  // worktree (wf_<runid>-N on a worktree-wf_* branch) to squat in; measured:
+  // builders did whole features there, stranding work outside the slug layout.
+  { label: 'contract-barrier', phase: 'Contract barrier', schema: BARRIER_SCHEMA, model: 'opus' },
 )
 
 if (!barrier.committed) {
@@ -540,9 +544,13 @@ async function buildFeature(f, mode, baseSha) {
   const { builder } = agentsFor(f)
   const opts = { label: `build:${f.id}${mode === 'trunk' ? '' : ':par'}`, phase: 'Build', schema: BUILD_SCHEMA, model: 'sonnet' }
   if (builder) opts.agentType = builder
-  // Parallel builders get harness worktree isolation as belt-and-suspenders;
-  // trunk builders MUST share real state, so no isolation flag for them.
-  if (mode !== 'trunk') opts.isolation = 'worktree'
+  // NO isolation:'worktree' for either mode: trunk builders MUST share the real
+  // trunk worktree, and parallel builders create their own explicitly-named
+  // worktree per the prompt. Passing the harness flag too gave agents a second,
+  // non-convention worktree (wf_<runid>-N, branch worktree-wf_*) to squat in —
+  // measured: builders did their whole feature there instead of the instructed
+  // .claude/worktrees/<slug>/<id> path, stranding branches in harness debris.
+  // One worktree mechanism only: the explicit, slug-scoped one.
   const where =
     mode === 'trunk'
       ? `DIRECTLY on the iteration build branch \`${buildBranch}\` in the EXISTING shared build worktree \`${TRUNK_WORKTREE}\` — do NOT create a new worktree or branch; you have exclusive ownership of this worktree for the duration of this feature, and every shipped dependency's code is already on the branch. FIRST run \`git rev-parse HEAD\` there (expected ${baseSha}) and treat that sha as your diff base.`
@@ -905,6 +913,8 @@ if (convergence?.mrOpened && !convergence?.pushError && shipped.length) {
 
 ${parallelShippedIds.length ? `For EACH parallel-built shipped feature id [${parallelShippedIds.join(', ')}] (the only ones with their own scaffolding — trunk-built features created none): FIRST re-verify its commits are present on \`integration/${ITERATION_SLUG}\` (\`git cherry\` / \`git log\` — confirm before deleting; if a feature's commits are NOT there, do NOT delete it, report it under kept). Then for each confirmed one: \`git worktree remove ${WORKTREE_DIR}/<id-lowercased>\` and \`git branch -D feat/<id-lowercased>\`.` : 'No parallel feature worktrees exist (everything built on the trunk) — nothing per-feature to remove.'}
 ${removeTrunkWorktree ? `Remove the trunk worktree \`${TRUNK_WORKTREE}\` (keep the \`${buildBranch}\` BRANCH — only the worktree goes; its commits are on the pushed integration branch).` : `KEEP the trunk worktree \`${TRUNK_WORKTREE}\` and the \`${buildBranch}\` branch — they hold un-collected (blocked/contaminated) work the human still needs.`}
+HARNESS DEBRIS SWEEP: \`git worktree list\` + \`git branch --list 'worktree-wf_*'\` may show leftover agent-isolation worktrees (paths like .claude/worktrees/wf_*) and their auto-branches. For each: if its commits are contained in \`integration/${ITERATION_SLUG}\` (\`git cherry\`/\`git log\`) or it has no commits beyond its base, remove the worktree and delete the branch — it is scratch debris. If it holds UNIQUE un-collected commits, KEEP it and report it.
+
 KEEP, do NOT touch: the integration worktree/branch \`${WORKTREE_DIR}/integration\` (holds the pushed branch), the \`${buildBranch}\` branch, and every LEFT-OUT/blocked feature's worktree+branch [${leftOut.join(', ') || 'none'}] (un-collected work — never delete it).
 
 Report exactly which worktrees + branches you removed and which you kept.`,

@@ -217,6 +217,13 @@ code — never from a bare base with the dep's code missing (the measured failur
 invents the missing foundation and the result is an unmergeable fork). If a hard dep did not
 ship, the dependent is **skipped loudly**, never built on a guess.
 
+**One worktree mechanism only.** A workflow `agent()` call must NOT pass `isolation: 'worktree'`
+to an agent whose prompt already instructs it to create or work in a named worktree — the
+harness flag spawns a second, non-convention worktree (`wf_<runid>-N` on a `worktree-wf_*`
+branch) and agents understandably squat in it, stranding their branches outside the
+`.claude/worktrees/<slug>/` layout (measured: two builders did entire features in harness
+debris). The explicit, slug-named worktree IS the isolation.
+
 Tear a worktree down once its work is collected (folded/merged), keeping any worktree that
 still holds un-collected (blocked) work. Interactive, turn-by-turn work with the human stays on
 the primary branch where you both are.
